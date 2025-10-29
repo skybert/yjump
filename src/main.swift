@@ -59,7 +59,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Create and show window
     windowController = SearchWindowController(config: config)
     windowController?.loadWindow()
-    windowController?.window?.makeKeyAndOrderFront(nil)
+    windowController?.window?.makeKeyAndOrderFront(self)
 
     // Ensure window gets focus
     NSApp.activate(ignoringOtherApps: true)

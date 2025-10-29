@@ -1,0 +1,40 @@
+name: build-and-release-macos-binary
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0, v2.1.3, etc.
+
+permissions:
+  contents: write  # This is crucial for creating releases
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+    - name: checkout-code
+      uses: actions/checkout@v4
+
+    - name: setup-xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+
+    - name: build-macos-multi-arch-binary
+      run: |
+        swift build -c release --arch arm64 --arch x86_64
+
+    - name: create-archive
+      run: |
+        cd .build/apple/Products/Release
+        tar -czf $GITHUB_WORKSPACE/yjump-${{ github.ref_name }}.tar.gz yjump
+
+    - name: create-release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: yjump-${{ github.ref_name }}.tar.gz
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
