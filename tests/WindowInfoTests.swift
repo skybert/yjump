@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 
 // MARK: - Simple Test Framework
+
 var testsPassed = 0
 var testsFailed = 0
 
@@ -14,7 +15,13 @@ func assertTest(_ condition: Bool, _ message: String = "", file: String = #file,
     }
 }
 
-func assertEqual<T: Equatable>(_ actual: T, _ expected: T, _ message: String = "", file: String = #file, line: Int = #line) {
+func assertEqual<T: Equatable>(
+    _ actual: T,
+    _ expected: T,
+    _ message: String = "",
+    file: String = #file,
+    line: Int = #line
+) {
     if actual == expected {
         testsPassed += 1
     } else {
@@ -40,6 +47,7 @@ func printTestResults() {
 }
 
 // MARK: - Window Information (duplicated for testing)
+
 struct WindowInfo {
     let windowNumber: CGWindowID
     let ownerPID: pid_t
@@ -47,26 +55,28 @@ struct WindowInfo {
     let windowTitle: String
     let bounds: CGRect
     let workspace: Int
-    
+
     var displayText: String {
         if windowTitle.isEmpty {
             return ownerName
         }
         return "\(ownerName): \(windowTitle)"
     }
-    
+
     var searchableText: String {
         return displayText.lowercased()
     }
 }
 
 // MARK: - Bounds Distance Function
+
 func boundsDistance(_ b1: CGRect, _ b2: CGRect) -> CGFloat {
     return abs(b1.origin.x - b2.origin.x) + abs(b1.origin.y - b2.origin.y) +
-           abs(b1.width - b2.width) + abs(b1.height - b2.height)
+        abs(b1.width - b2.width) + abs(b1.height - b2.height)
 }
 
 // MARK: - Tests
+
 print("Running Window Info Tests...")
 
 func testDisplayTextWithTitle() {
@@ -78,7 +88,7 @@ func testDisplayTextWithTitle() {
         bounds: CGRect(x: 0, y: 0, width: 800, height: 600),
         workspace: 0
     )
-    
+
     assertEqual(window.displayText, "Firefox: GitHub - Mozilla Firefox", "Display text with title")
 }
 
@@ -91,7 +101,7 @@ func testDisplayTextWithoutTitle() {
         bounds: CGRect(x: 0, y: 0, width: 800, height: 600),
         workspace: 0
     )
-    
+
     assertEqual(window.displayText, "Terminal", "Display text without title")
 }
 
@@ -104,7 +114,7 @@ func testSearchableTextIsLowercase() {
         bounds: CGRect(x: 0, y: 0, width: 800, height: 600),
         workspace: 0
     )
-    
+
     assertEqual(window.searchableText, "google chrome: github homepage", "Searchable text should be lowercase")
 }
 
@@ -117,7 +127,7 @@ func testSearchableTextWithoutTitle() {
         bounds: CGRect(x: 0, y: 0, width: 800, height: 600),
         workspace: 0
     )
-    
+
     assertEqual(window.searchableText, "safari", "Searchable text without title")
 }
 
@@ -131,7 +141,7 @@ func testBoundsStorage() {
         bounds: bounds,
         workspace: 1
     )
-    
+
     assertEqual(window.bounds.origin.x, 100, "Bounds x coordinate")
     assertEqual(window.bounds.origin.y, 200, "Bounds y coordinate")
     assertEqual(window.bounds.width, 1024, "Bounds width")
@@ -147,7 +157,7 @@ func testWorkspaceStorage() {
         bounds: CGRect.zero,
         workspace: 0
     )
-    
+
     let window2 = WindowInfo(
         windowNumber: 7,
         ownerPID: 106,
@@ -156,7 +166,7 @@ func testWorkspaceStorage() {
         bounds: CGRect.zero,
         workspace: 2
     )
-    
+
     assertEqual(window1.workspace, 0, "Workspace 0")
     assertEqual(window2.workspace, 2, "Workspace 2")
 }
@@ -170,7 +180,7 @@ func testPIDAndWindowNumber() {
         bounds: CGRect.zero,
         workspace: 0
     )
-    
+
     assertEqual(window.windowNumber, 12345, "Window number")
     assertEqual(window.ownerPID, 9999, "Owner PID")
 }
@@ -184,7 +194,7 @@ func testSpecialCharactersInTitle() {
         bounds: CGRect.zero,
         workspace: 0
     )
-    
+
     assertEqual(window.displayText, "Emacs: README.md - ~/Projects/yjump", "Display text with special characters")
     assertTest(window.searchableText.contains("readme.md"), "Searchable text should contain readme.md")
 }
@@ -198,7 +208,7 @@ func testUnicodeInTitle() {
         bounds: CGRect.zero,
         workspace: 0
     )
-    
+
     assertEqual(window.displayText, "Notes: 📝 TODO List", "Display text with unicode")
     assertTest(window.searchableText.contains("📝"), "Searchable text should contain emoji")
 }
@@ -215,12 +225,13 @@ testSpecialCharactersInTitle()
 testUnicodeInTitle()
 
 // MARK: - Bounds Distance Tests
+
 print("\nRunning Bounds Distance Tests...")
 
 func testIdenticalBounds() {
     let bounds = CGRect(x: 100, y: 200, width: 800, height: 600)
     let distance = boundsDistance(bounds, bounds)
-    
+
     assertEqual(distance, 0, "Identical bounds should have zero distance")
 }
 
@@ -228,7 +239,7 @@ func testDifferentOriginOnly() {
     let bounds1 = CGRect(x: 100, y: 200, width: 800, height: 600)
     let bounds2 = CGRect(x: 110, y: 210, width: 800, height: 600)
     let distance = boundsDistance(bounds1, bounds2)
-    
+
     // |110-100| + |210-200| + |800-800| + |600-600| = 10 + 10 = 20
     assertEqual(distance, 20, "Different origin only distance")
 }
@@ -237,7 +248,7 @@ func testDifferentSizeOnly() {
     let bounds1 = CGRect(x: 100, y: 200, width: 800, height: 600)
     let bounds2 = CGRect(x: 100, y: 200, width: 850, height: 650)
     let distance = boundsDistance(bounds1, bounds2)
-    
+
     // |100-100| + |200-200| + |850-800| + |650-600| = 50 + 50 = 100
     assertEqual(distance, 100, "Different size only distance")
 }
@@ -246,7 +257,7 @@ func testCompletelyDifferent() {
     let bounds1 = CGRect(x: 0, y: 0, width: 800, height: 600)
     let bounds2 = CGRect(x: 100, y: 200, width: 1024, height: 768)
     let distance = boundsDistance(bounds1, bounds2)
-    
+
     // |100-0| + |200-0| + |1024-800| + |768-600| = 100 + 200 + 224 + 168 = 692
     assertEqual(distance, 692, "Completely different bounds distance")
 }
@@ -255,7 +266,7 @@ func testNegativeCoordinates() {
     let bounds1 = CGRect(x: -100, y: -200, width: 800, height: 600)
     let bounds2 = CGRect(x: 100, y: 200, width: 800, height: 600)
     let distance = boundsDistance(bounds1, bounds2)
-    
+
     // |100-(-100)| + |200-(-200)| + |800-800| + |600-600| = 200 + 400 = 600
     assertEqual(distance, 600, "Negative coordinates distance")
 }
@@ -264,7 +275,7 @@ func testSmallDifference() {
     let bounds1 = CGRect(x: 100, y: 200, width: 800, height: 600)
     let bounds2 = CGRect(x: 101, y: 201, width: 801, height: 601)
     let distance = boundsDistance(bounds1, bounds2)
-    
+
     // Small difference = 1 + 1 + 1 + 1 = 4
     assertEqual(distance, 4, "Small difference distance")
 }
@@ -273,7 +284,7 @@ func testZeroBounds() {
     let bounds1 = CGRect.zero
     let bounds2 = CGRect(x: 100, y: 200, width: 800, height: 600)
     let distance = boundsDistance(bounds1, bounds2)
-    
+
     assertEqual(distance, 1700, "Zero bounds distance")
 }
 

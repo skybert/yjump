@@ -2,14 +2,15 @@ import Cocoa
 import Foundation
 
 // MARK: - Configuration
+
 public struct Config {
     var windowWidth: CGFloat = 600
     var windowHeight: CGFloat = 50
-    var backgroundColor: NSColor = NSColor(hex: "#24273A") ?? .darkGray
-    var textColor: NSColor = NSColor(hex: "#CAD3F5") ?? .white
-    var placeholderColor: NSColor = NSColor(hex: "#6E738D") ?? .gray
-    var selectionColor: NSColor = NSColor(hex: "#8AADF4") ?? .blue
-    var borderColor: NSColor = NSColor(hex: "#5B6078") ?? .gray
+    var backgroundColor: NSColor = .init(hex: "#24273A") ?? .darkGray
+    var textColor: NSColor = .init(hex: "#CAD3F5") ?? .white
+    var placeholderColor: NSColor = .init(hex: "#6E738D") ?? .gray
+    var selectionColor: NSColor = .init(hex: "#8AADF4") ?? .blue
+    var borderColor: NSColor = .init(hex: "#5B6078") ?? .gray
     var borderWidth: CGFloat = 2
     var cornerRadius: CGFloat = 8
     var fontName: String = "Menlo"
@@ -18,51 +19,51 @@ public struct Config {
     var caseSensitive: Bool = false
     var position: String = "center"
     var opacity: CGFloat = 0.95
-    
+
     // UI sizing
     var listRowHeight: CGFloat = 28
     var inputPadding: CGFloat = 12
     var maxListHeight: CGFloat {
         return CGFloat(maxResults) * listRowHeight
     }
-    
+
     // Performance
     var cacheWindowList: Bool = true
     var cacheTimeoutSeconds: Double = 2.0
-    
+
     public static func load() -> Config {
         var config = Config()
-        
+
         // XDG config locations
         let configPaths = [
             ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"].map { "\($0)/yjump/yjump.conf" },
             "\(NSHomeDirectory())/.config/yjump/yjump.conf",
-            "\(NSHomeDirectory())/.yjump.conf"
+            "\(NSHomeDirectory())/.yjump.conf",
         ].compactMap { $0 }
-        
+
         for path in configPaths {
             if let contents = try? String(contentsOfFile: path, encoding: .utf8) {
                 config.parse(contents)
                 break
             }
         }
-        
+
         return config
     }
-    
+
     mutating func parse(_ contents: String) {
         for line in contents.components(separatedBy: .newlines) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty || trimmed.hasPrefix("#") {
                 continue
             }
-            
+
             let parts = trimmed.components(separatedBy: "=").map { $0.trimmingCharacters(in: .whitespaces) }
             guard parts.count == 2 else { continue }
-            
+
             let key = parts[0]
             let value = parts[1]
-            
+
             switch key {
             case "window_width":
                 if let val = Double(value) { windowWidth = CGFloat(val) }
@@ -106,6 +107,7 @@ public struct Config {
 }
 
 // MARK: - NSColor Extension
+
 extension NSColor {
     convenience init?(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)

@@ -1,8 +1,9 @@
-import Cocoa
 import ApplicationServices
+import Cocoa
 import Foundation
 
 // MARK: - Window Information
+
 struct WindowInfo {
     let windowNumber: CGWindowID
     let ownerPID: pid_t
@@ -10,28 +11,29 @@ struct WindowInfo {
     let windowTitle: String
     let bounds: CGRect
     let workspace: Int
-    
+
     var displayText: String {
         if windowTitle.isEmpty {
             return ownerName
         }
         return "\(ownerName): \(windowTitle)"
     }
-    
+
     var searchableText: String {
         return displayText.lowercased()
     }
 }
 
 // MARK: - Fuzzy Matching
+
 func fuzzyMatch(_ pattern: String, _ text: String, caseSensitive: Bool = false) -> (matches: Bool, score: Int) {
     let patternToSearch = caseSensitive ? pattern : pattern.lowercased()
     let textToSearch = caseSensitive ? text : text.lowercased()
-    
+
     if patternToSearch.isEmpty {
         return (true, 0)
     }
-    
+
     // Simple substring matching - matches any part of the text
     if textToSearch.contains(patternToSearch) {
         // Score based on position (earlier match = higher score)
@@ -41,12 +43,12 @@ func fuzzyMatch(_ pattern: String, _ text: String, caseSensitive: Bool = false) 
             return (true, score)
         }
     }
-    
+
     // Fuzzy matching fallback
     var patternIndex = patternToSearch.startIndex
     var score = 0
     var consecutiveMatch = 0
-    
+
     for (_, char) in textToSearch.enumerated() {
         if patternIndex < patternToSearch.endIndex && char == patternToSearch[patternIndex] {
             score += 1 + consecutiveMatch * 5
@@ -56,21 +58,22 @@ func fuzzyMatch(_ pattern: String, _ text: String, caseSensitive: Bool = false) 
             consecutiveMatch = 0
         }
     }
-    
+
     let matches = patternIndex == patternToSearch.endIndex
     return (matches, matches ? score : 0)
 }
 
 // MARK: - Window Manager
+
 class WindowManager {
     private static var cachedWindows: [WindowInfo]?
     private static var cacheTimestamp: Date?
     private static var cacheTimeout: TimeInterval = 2.0
-    
+
     static func setCacheTimeout(_ timeout: TimeInterval) {
         cacheTimeout = timeout
     }
-    
+
     static func getAllWindows(useCache: Bool = true) -> [WindowInfo] {
         // Check cache if enabled
         if useCache, let cached = cachedWindows, let timestamp = cacheTimestamp {
@@ -79,51 +82,55 @@ class WindowManager {
                 return cached
             }
         }
-        
+
         var windows: [WindowInfo] = []
-        
-        guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+
+        guard let windowList = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID
+        ) as? [[String: Any]] else {
             return windows
         }
-        
+
         // Group windows by PID for batch AX lookups
         var windowsByPID: [pid_t: [(dict: [String: Any], number: CGWindowID, bounds: CGRect, name: String)]] = [:]
-        
+
         for windowDict in windowList {
             guard let ownerPID = windowDict[kCGWindowOwnerPID as String] as? pid_t,
                   let windowNumber = windowDict[kCGWindowNumber as String] as? CGWindowID,
-                  let boundsDict = windowDict[kCGWindowBounds as String] as? [String: CGFloat] else {
+                  let boundsDict = windowDict[kCGWindowBounds as String] as? [String: CGFloat]
+            else {
                 continue
             }
-            
+
             let ownerName = windowDict[kCGWindowOwnerName as String] as? String ?? ""
-            
+
             if ownerName.isEmpty || ownerName == "Window Server" || ownerName == "Dock" {
                 continue
             }
-            
+
             let bounds = CGRect(
                 x: boundsDict["X"] ?? 0,
                 y: boundsDict["Y"] ?? 0,
                 width: boundsDict["Width"] ?? 0,
                 height: boundsDict["Height"] ?? 0
             )
-            
+
             if bounds.width < 50 || bounds.height < 50 {
                 continue
             }
-            
+
             if windowsByPID[ownerPID] == nil {
                 windowsByPID[ownerPID] = []
             }
             windowsByPID[ownerPID]?.append((windowDict, windowNumber, bounds, ownerName))
         }
-        
+
         // Process each app's windows
         for (pid, pidWindows) in windowsByPID {
             let ownerName = pidWindows[0].name
             let skipAXLookup = ["Google Chrome", "Safari", "Arc", "Microsoft Edge"]
-            
+
             // Get all AX windows for this app at once
             var axWindowTitles: [CGRect: String] = [:]
             if !skipAXLookup.contains(ownerName) {
@@ -133,15 +140,15 @@ class WindowManager {
                     }
                 }
             }
-            
+
             // Match each CG window with AX title
             for (windowDict, windowNumber, cgBounds, _) in pidWindows {
                 var windowTitle = windowDict[kCGWindowName as String] as? String ?? ""
-                
+
                 // Try to find matching AX window if no title
                 if windowTitle.isEmpty && !axWindowTitles.isEmpty {
                     var bestMatch: (title: String, distance: CGFloat, bounds: CGRect)?
-                    
+
                     for (axBounds, title) in axWindowTitles {
                         let distance = boundsDistance(cgBounds, axBounds)
                         if distance < 100 { // Increased tolerance
@@ -150,14 +157,14 @@ class WindowManager {
                             }
                         }
                     }
-                    
+
                     if let match = bestMatch {
                         windowTitle = match.title
                         // Remove the matched AX window so it won't be reused
                         axWindowTitles.removeValue(forKey: match.bounds)
                     }
                 }
-                
+
                 windows.append(WindowInfo(
                     windowNumber: windowNumber,
                     ownerPID: pid,
@@ -168,81 +175,84 @@ class WindowManager {
                 ))
             }
         }
-        
+
         // Update cache
         if useCache {
             cachedWindows = windows
             cacheTimestamp = Date()
         }
-        
+
         return windows
     }
-    
+
     static func boundsDistance(_ b1: CGRect, _ b2: CGRect) -> CGFloat {
         return abs(b1.origin.x - b2.origin.x) + abs(b1.origin.y - b2.origin.y) +
-               abs(b1.width - b2.width) + abs(b1.height - b2.height)
+            abs(b1.width - b2.width) + abs(b1.height - b2.height)
     }
-    
+
     static func getAXWindowsForPID(pid: pid_t) -> [(element: AXUIElement, title: String, bounds: CGRect)]? {
         let appElement = AXUIElementCreateApplication(pid)
         var windowsRef: AnyObject?
-        
+
         guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef) == .success,
-              let windows = windowsRef as? [AXUIElement] else {
+              let windows = windowsRef as? [AXUIElement]
+        else {
             return nil
         }
-        
+
         var result: [(AXUIElement, String, CGRect)] = []
-        
+
         for axWindow in windows {
             var titleRef: AnyObject?
             var posRef: AnyObject?
             var sizeRef: AnyObject?
-            
+
             guard AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleRef) == .success,
                   let title = titleRef as? String, !title.isEmpty,
                   AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &posRef) == .success,
                   AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &sizeRef) == .success,
-                  let posValue = posRef as CFTypeRef?, let sizeValue = sizeRef as CFTypeRef? else {
+                  let posValue = posRef as CFTypeRef?, let sizeValue = sizeRef as CFTypeRef?
+            else {
                 continue
             }
-            
+
             var point = CGPoint.zero
             var size = CGSize.zero
-            
+
             if AXValueGetValue(posValue as! AXValue, .cgPoint, &point),
-               AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) {
+               AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
+            {
                 result.append((axWindow, title, CGRect(origin: point, size: size)))
             }
         }
-        
+
         return result.isEmpty ? nil : result
     }
-    
+
     static func invalidateCache() {
         cachedWindows = nil
         cacheTimestamp = nil
     }
-    
+
     static func activateWindow(_ window: WindowInfo) {
         // Get the running application for the window's owner
         let app = NSRunningApplication(processIdentifier: window.ownerPID)
-        
+
         // Activate the application
         app?.activate()
-        
+
         // Use AXUIElement to raise the specific window
         let appElement = AXUIElementCreateApplication(window.ownerPID)
         var windowsRef: AnyObject?
-        
+
         let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef)
-        
+
         if result == .success, let windows = windowsRef as? [AXUIElement] {
             // Try to find and raise the specific window
             for axWindow in windows {
                 var titleRef: AnyObject?
                 AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleRef)
-                
+
                 if let title = titleRef as? String, title == window.windowTitle || window.windowTitle.isEmpty {
                     AXUIElementSetAttributeValue(axWindow, kAXMainAttribute as CFString, true as CFTypeRef)
                     AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
@@ -254,34 +264,36 @@ class WindowManager {
 }
 
 // MARK: - Custom Text Field
+
 class CustomTextField: NSTextField {
     var config: Config
-    
+
     init(config: Config) {
         self.config = config
         super.init(frame: .zero)
-        self.setupAppearance()
+        setupAppearance()
     }
-    
-    required init?(coder: NSCoder) {
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     func setupAppearance() {
-        self.isBordered = false
-        self.isBezeled = false
-        self.drawsBackground = false
-        self.textColor = config.textColor
-        self.font = NSFont(name: config.fontName, size: config.fontSize) ?? NSFont.systemFont(ofSize: config.fontSize)
-        self.focusRingType = .none
-        
+        isBordered = false
+        isBezeled = false
+        drawsBackground = false
+        textColor = config.textColor
+        font = NSFont(name: config.fontName, size: config.fontSize) ?? NSFont.systemFont(ofSize: config.fontSize)
+        focusRingType = .none
+
         // Set placeholder color
-        if let placeholder = self.placeholderString {
-            self.placeholderAttributedString = NSAttributedString(
+        if let placeholder = placeholderString {
+            placeholderAttributedString = NSAttributedString(
                 string: placeholder,
                 attributes: [
                     .foregroundColor: config.placeholderColor,
-                    .font: self.font ?? NSFont.systemFont(ofSize: config.fontSize)
+                    .font: font ?? NSFont.systemFont(ofSize: config.fontSize),
                 ]
             )
         }
@@ -289,12 +301,13 @@ class CustomTextField: NSTextField {
 }
 
 // MARK: - Custom Window
+
 class BorderedWindow: NSWindow {
     var config: Config
-    
+
     init(config: Config, height: CGFloat) {
         self.config = config
-        
+
         let contentRect = NSRect(x: 0, y: 0, width: config.windowWidth, height: height)
         super.init(
             contentRect: contentRect,
@@ -302,42 +315,44 @@ class BorderedWindow: NSWindow {
             backing: .buffered,
             defer: false
         )
-        
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.level = .floating
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        self.hasShadow = true
+
+        isOpaque = false
+        backgroundColor = .clear
+        level = .floating
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        hasShadow = true
     }
-    
+
     override var canBecomeKey: Bool {
         return true
     }
-    
+
     override var canBecomeMain: Bool {
         return true
     }
 }
 
 // MARK: - Content View with Border
+
 class BorderedContentView: NSView {
     var config: Config
-    
+
     init(config: Config) {
         self.config = config
         super.init(frame: .zero)
-        self.wantsLayer = true
+        wantsLayer = true
     }
-    
-    required init?(coder: NSCoder) {
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     override func updateLayer() {
         super.updateLayer()
-        
-        guard let layer = self.layer else { return }
-        
+
+        guard let layer = layer else { return }
+
         layer.backgroundColor = config.backgroundColor.withAlphaComponent(config.opacity).cgColor
         layer.cornerRadius = config.cornerRadius
         layer.borderWidth = config.borderWidth
@@ -346,49 +361,53 @@ class BorderedContentView: NSView {
 }
 
 // MARK: - UI Components
+
 class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
     var searchField: CustomTextField!
     var tableView: NSTableView!
     var scrollView: NSScrollView!
     var containerView: BorderedContentView!
-    
+
     var allWindows: [WindowInfo] = []
     var filteredWindows: [WindowInfo] = []
     var selectedIndex: Int = 0
     var config: Config
-    
+
     init(config: Config) {
         self.config = config
         super.init(window: nil)
     }
-    
-    required init?(coder: NSCoder) {
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     override func loadWindow() {
         // Start with just input box height
         let window = BorderedWindow(config: config, height: config.windowHeight)
         self.window = window
-        
+
         setupUI()
         loadWindows()
         positionWindow(window)
     }
-    
+
     func positionWindow(_ window: NSWindow) {
         if let screen = NSScreen.main {
             let screenRect = screen.visibleFrame
             let windowRect = window.frame
-            
+
             let x: CGFloat
             let y: CGFloat
-            
+
             if config.position.contains(",") {
-                let coords = config.position.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                let coords = config.position.components(separatedBy: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
                 if coords.count == 2,
                    let xVal = Double(coords[0]),
-                   let yVal = Double(coords[1]) {
+                   let yVal = Double(coords[1])
+                {
                     x = CGFloat(xVal)
                     y = CGFloat(yVal)
                 } else {
@@ -414,16 +433,16 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
                     y = screenRect.maxY - (screenRect.height / 3) - windowRect.height / 2
                 }
             }
-            
+
             window.setFrameOrigin(NSPoint(x: x, y: y))
         }
     }
-    
+
     func setupUI() {
-        guard let window = self.window else { return }
-        
+        guard let window = window else { return }
+
         containerView = BorderedContentView(config: config)
-        
+
         // Search field at top
         searchField = CustomTextField(config: config)
         searchField.placeholderString = "Search windows..."
@@ -434,7 +453,7 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
             width: config.windowWidth - (config.inputPadding * 2),
             height: config.windowHeight - (config.inputPadding * 2)
         )
-        
+
         // Table view for results
         tableView = NSTableView()
         tableView.dataSource = self
@@ -445,11 +464,11 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
         tableView.rowHeight = config.listRowHeight
         tableView.intercellSpacing = NSSize(width: 0, height: 2)
         tableView.focusRingType = .none
-        
+
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("WindowColumn"))
         column.width = config.windowWidth - (config.inputPadding * 2)
         tableView.addTableColumn(column)
-        
+
         // Scroll view
         scrollView = NSScrollView()
         scrollView.documentView = tableView
@@ -465,43 +484,43 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
             width: config.windowWidth - (config.inputPadding * 2),
             height: 0
         )
-        
+
         containerView.addSubview(scrollView)
         containerView.addSubview(searchField)
-        
+
         window.contentView = containerView
-        
+
         // Initial focus
         DispatchQueue.main.async {
             window.makeFirstResponder(self.searchField)
         }
     }
-    
+
     func loadWindows() {
         // Configure cache settings
         WindowManager.setCacheTimeout(config.cacheTimeoutSeconds)
-        
+
         // Load windows (will use cache if enabled)
         allWindows = WindowManager.getAllWindows(useCache: config.cacheWindowList)
         filteredWindows = []
     }
-    
+
     func updateWindowSize() {
-        guard let window = self.window else { return }
-        
+        guard let window = window else { return }
+
         let hasResults = !filteredWindows.isEmpty
         let listHeight = hasResults ? config.maxListHeight : 0
         let spacing: CGFloat = hasResults ? config.inputPadding : 0
-        
+
         let newHeight = config.windowHeight + listHeight + spacing
-        
+
         var frame = window.frame
         let oldHeight = frame.height
         frame.size.height = newHeight
         frame.origin.y += (oldHeight - newHeight)
-        
+
         window.setFrame(frame, display: true, animate: false)
-        
+
         // Update scroll view frame
         scrollView.frame = NSRect(
             x: config.inputPadding,
@@ -509,7 +528,7 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
             width: config.windowWidth - (config.inputPadding * 2),
             height: listHeight
         )
-        
+
         // Update search field frame
         searchField.frame = NSRect(
             x: config.inputPadding,
@@ -518,13 +537,14 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
             height: config.windowHeight - (config.inputPadding * 2)
         )
     }
-    
+
     // MARK: - NSTextFieldDelegate
-    func controlTextDidChange(_ obj: Notification) {
+
+    func controlTextDidChange(_: Notification) {
         filterWindows()
     }
-    
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+
+    func control(_: NSControl, textView _: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         switch commandSelector {
         case #selector(NSResponder.moveDown(_:)):
             if selectedIndex < filteredWindows.count - 1 {
@@ -550,56 +570,58 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
             return false
         }
     }
-    
+
     func filterWindows() {
         let searchText = searchField.stringValue
-        
+
         if searchText.isEmpty {
             filteredWindows = []
         } else {
             var scoredWindows: [(window: WindowInfo, score: Int)] = []
-            
+
             for window in allWindows {
                 let result = fuzzyMatch(searchText, window.displayText, caseSensitive: config.caseSensitive)
                 if result.matches {
                     scoredWindows.append((window, result.score))
                 }
             }
-            
+
             scoredWindows.sort { $0.score > $1.score }
             filteredWindows = Array(scoredWindows.prefix(config.maxResults).map { $0.window })
         }
-        
+
         selectedIndex = 0
         tableView.reloadData()
         updateWindowSize()
-        
+
         if !filteredWindows.isEmpty {
             tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         }
     }
-    
+
     func activateSelectedWindow() {
         guard selectedIndex >= 0 && selectedIndex < filteredWindows.count else {
             NSApplication.shared.terminate(nil)
             return
         }
-        
+
         let window = filteredWindows[selectedIndex]
         WindowManager.activateWindow(window)
         NSApplication.shared.terminate(nil)
     }
-    
+
     // MARK: - NSTableViewDataSource
-    func numberOfRows(in tableView: NSTableView) -> Int {
+
+    func numberOfRows(in _: NSTableView) -> Int {
         return filteredWindows.count
     }
-    
+
     // MARK: - NSTableViewDelegate
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+
+    func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("WindowCell")
         var cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView
-        
+
         if cell == nil {
             cell = NSTableCellView()
             let textField = NSTextField()
@@ -607,36 +629,37 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
             textField.isEditable = false
             textField.backgroundColor = .clear
             textField.textColor = config.textColor
-            textField.font = NSFont(name: config.fontName, size: config.fontSize - 1) ?? NSFont.systemFont(ofSize: config.fontSize - 1)
+            textField.font = NSFont(name: config.fontName, size: config.fontSize - 1) ?? NSFont
+                .systemFont(ofSize: config.fontSize - 1)
             textField.lineBreakMode = .byTruncatingTail
             textField.translatesAutoresizingMaskIntoConstraints = false
             cell?.addSubview(textField)
             cell?.textField = textField
-            
+
             NSLayoutConstraint.activate([
                 textField.leadingAnchor.constraint(equalTo: cell!.leadingAnchor, constant: 8),
                 textField.trailingAnchor.constraint(equalTo: cell!.trailingAnchor, constant: -8),
-                textField.centerYAnchor.constraint(equalTo: cell!.centerYAnchor)
+                textField.centerYAnchor.constraint(equalTo: cell!.centerYAnchor),
             ])
-            
+
             cell?.identifier = identifier
         }
-        
+
         cell?.textField?.stringValue = filteredWindows[row].displayText
-        
+
         return cell
     }
-    
-    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+
+    func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
         selectedIndex = row
         return true
     }
-    
-    func tableViewSelectionDidChange(_ notification: Notification) {
+
+    func tableViewSelectionDidChange(_: Notification) {
         selectedIndex = tableView.selectedRow
     }
-    
-    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+
+    func tableView(_: NSTableView, rowViewForRow _: Int) -> NSTableRowView? {
         let rowView = NSTableRowView()
         rowView.selectionHighlightStyle = .regular
         return rowView
@@ -644,16 +667,17 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
 }
 
 // MARK: - App Delegate
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     var windowController: SearchWindowController?
-    
-    func applicationDidFinishLaunching(_ notification: Notification) {
+
+    func applicationDidFinishLaunching(_: Notification) {
         // Parse CLI arguments first
         if CLI.parse() {
             // CLI handled the request (--help or --version), exit
             exit(0)
         }
-        
+
         // Check for running instance of yjump
         let runningApps = NSWorkspace.shared.runningApplications
         let yjumpInstances = runningApps.filter { app in
@@ -664,7 +688,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let execName = app.executableURL?.lastPathComponent ?? ""
             return execName == "yjump"
         }
-        
+
         // If there are other instances (more than just this one), terminate
         if yjumpInstances.count > 1 {
             // Try to activate the existing instance
@@ -676,11 +700,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             exit(0)
         }
-        
+
         // Request accessibility permissions
         let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         let accessEnabled = AXIsProcessTrustedWithOptions(options)
-        
+
         if !accessEnabled {
             let alert = NSAlert()
             alert.messageText = "Accessibility Permission Required"
@@ -689,27 +713,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.addButton(withTitle: "OK")
             alert.runModal()
         }
-        
+
         // Load config
         let config = Config.load()
-        
+
         windowController = SearchWindowController(config: config)
         windowController?.loadWindow()
         windowController?.window?.makeKeyAndOrderFront(nil)
-        
+
         // Ensure window gets focus
         NSApp.activate(ignoringOtherApps: true)
         windowController?.window?.makeKey()
         windowController?.window?.orderFrontRegardless()
         windowController?.window?.makeFirstResponder(windowController?.searchField)
     }
-    
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+
+    func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {
         return true
     }
 }
 
 // MARK: - Main
+
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory) // Don't show in Dock
 let delegate = AppDelegate()

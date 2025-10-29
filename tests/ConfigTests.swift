@@ -2,6 +2,7 @@ import Cocoa
 import Foundation
 
 // MARK: - Simple Test Framework
+
 var testsPassed = 0
 var testsFailed = 0
 
@@ -14,7 +15,13 @@ func assertTest(_ condition: Bool, _ message: String = "", file: String = #file,
     }
 }
 
-func assertEqual<T: Equatable>(_ actual: T, _ expected: T, _ message: String = "", file: String = #file, line: Int = #line) {
+func assertEqual<T: Equatable>(
+    _ actual: T,
+    _ expected: T,
+    _ message: String = "",
+    file: String = #file,
+    line: Int = #line
+) {
     if actual == expected {
         testsPassed += 1
     } else {
@@ -44,7 +51,13 @@ func assertNil<T>(_ value: T?, _ message: String = "", file: String = #file, lin
     }
 }
 
-func assertGreaterThan<T: Comparable>(_ value: T, _ threshold: T, _ message: String = "", file: String = #file, line: Int = #line) {
+func assertGreaterThan<T: Comparable>(
+    _ value: T,
+    _ threshold: T,
+    _ message: String = "",
+    file: String = #file,
+    line: Int = #line
+) {
     if value > threshold {
         testsPassed += 1
     } else {
@@ -70,6 +83,7 @@ func printTestResults() {
 
 // Import the Config struct from conf.swift
 // MARK: - NSColor Extension (duplicated for testing)
+
 extension NSColor {
     convenience init?(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -94,14 +108,15 @@ extension NSColor {
 }
 
 // MARK: - Configuration
+
 public struct Config {
     var windowWidth: CGFloat = 600
     var windowHeight: CGFloat = 50
-    var backgroundColor: NSColor = NSColor(hex: "#24273A") ?? .darkGray
-    var textColor: NSColor = NSColor(hex: "#CAD3F5") ?? .white
-    var placeholderColor: NSColor = NSColor(hex: "#6E738D") ?? .gray
-    var selectionColor: NSColor = NSColor(hex: "#8AADF4") ?? .blue
-    var borderColor: NSColor = NSColor(hex: "#5B6078") ?? .gray
+    var backgroundColor: NSColor = .init(hex: "#24273A") ?? .darkGray
+    var textColor: NSColor = .init(hex: "#CAD3F5") ?? .white
+    var placeholderColor: NSColor = .init(hex: "#6E738D") ?? .gray
+    var selectionColor: NSColor = .init(hex: "#8AADF4") ?? .blue
+    var borderColor: NSColor = .init(hex: "#5B6078") ?? .gray
     var borderWidth: CGFloat = 2
     var cornerRadius: CGFloat = 8
     var fontName: String = "Menlo"
@@ -110,29 +125,29 @@ public struct Config {
     var caseSensitive: Bool = false
     var position: String = "center"
     var opacity: CGFloat = 0.95
-    
+
     var listRowHeight: CGFloat = 28
     var inputPadding: CGFloat = 12
     var maxListHeight: CGFloat {
         return CGFloat(maxResults) * listRowHeight
     }
-    
+
     var cacheWindowList: Bool = true
     var cacheTimeoutSeconds: Double = 2.0
-    
+
     mutating func parse(_ contents: String) {
         for line in contents.components(separatedBy: .newlines) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty || trimmed.hasPrefix("#") {
                 continue
             }
-            
+
             let parts = trimmed.components(separatedBy: "=").map { $0.trimmingCharacters(in: .whitespaces) }
             guard parts.count == 2 else { continue }
-            
+
             let key = parts[0]
             let value = parts[1]
-            
+
             switch key {
             case "window_width":
                 if let val = Double(value) { windowWidth = CGFloat(val) }
@@ -176,11 +191,12 @@ public struct Config {
 }
 
 // MARK: - Tests
+
 print("Running Config Tests...")
 
 func testDefaultConfig() {
     let config = Config()
-    
+
     assertEqual(config.windowWidth, 600, "Default window width")
     assertEqual(config.windowHeight, 50, "Default window height")
     assertEqual(config.borderWidth, 2, "Default border width")
@@ -202,7 +218,7 @@ func testCatppuccinMacchiatoColors() {
     let expectedPlaceholder = NSColor(hex: "#6E738D")
     let expectedSelection = NSColor(hex: "#8AADF4")
     let expectedBorder = NSColor(hex: "#5B6078")
-    
+
     assertNotNil(expectedBg, "Catppuccin background color")
     assertNotNil(expectedText, "Catppuccin text color")
     assertNotNil(expectedPlaceholder, "Catppuccin placeholder color")
@@ -216,9 +232,9 @@ func testParseWindowDimensions() {
     window_width = 800
     window_height = 60
     """
-    
+
     config.parse(configText)
-    
+
     assertEqual(config.windowWidth, 800, "Parsed window width")
     assertEqual(config.windowHeight, 60, "Parsed window height")
 }
@@ -232,9 +248,9 @@ func testParseColors() {
     selection_color = #FFFF00
     border_color = #FF00FF
     """
-    
+
     config.parse(configText)
-    
+
     // Colors should be parsed and set
     assertTest(config.backgroundColor != NSColor.darkGray, "Background color should be parsed")
     assertTest(config.textColor != NSColor.white, "Text color should be parsed")
@@ -246,9 +262,9 @@ func testParseBorderAndRadius() {
     border_width = 5
     corner_radius = 12
     """
-    
+
     config.parse(configText)
-    
+
     assertEqual(config.borderWidth, 5, "Parsed border width")
     assertEqual(config.cornerRadius, 12, "Parsed corner radius")
 }
@@ -259,9 +275,9 @@ func testParseFont() {
     font_name = Monaco
     font_size = 16
     """
-    
+
     config.parse(configText)
-    
+
     assertEqual(config.fontName, "Monaco", "Parsed font name")
     assertEqual(config.fontSize, 16, "Parsed font size")
 }
@@ -273,9 +289,9 @@ func testParseBehavior() {
     case_sensitive = true
     position = top
     """
-    
+
     config.parse(configText)
-    
+
     assertEqual(config.maxResults, 20, "Parsed max results")
     assertEqual(config.caseSensitive, true, "Parsed case sensitive")
     assertEqual(config.position, "top", "Parsed position")
@@ -286,9 +302,9 @@ func testParseOpacity() {
     let configText = """
     opacity = 0.75
     """
-    
+
     config.parse(configText)
-    
+
     assertEqual(config.opacity, 0.75, "Parsed opacity")
 }
 
@@ -298,9 +314,9 @@ func testParseCache() {
     cache_window_list = false
     cache_timeout_seconds = 5.0
     """
-    
+
     config.parse(configText)
-    
+
     assertEqual(config.cacheWindowList, false, "Parsed cache window list")
     assertEqual(config.cacheTimeoutSeconds, 5.0, "Parsed cache timeout")
 }
@@ -313,9 +329,9 @@ func testParseIgnoresComments() {
     # Another comment
     window_height = 55
     """
-    
+
     config.parse(configText)
-    
+
     assertEqual(config.windowWidth, 700, "Parsed window width with comments")
     assertEqual(config.windowHeight, 55, "Parsed window height with comments")
 }
@@ -324,13 +340,13 @@ func testParseIgnoresEmptyLines() {
     var config = Config()
     let configText = """
     window_width = 700
-    
-    
+
+
     window_height = 55
     """
-    
+
     config.parse(configText)
-    
+
     assertEqual(config.windowWidth, 700, "Parsed window width with empty lines")
     assertEqual(config.windowHeight, 55, "Parsed window height with empty lines")
 }
@@ -343,9 +359,9 @@ func testParseIgnoresMalformedLines() {
     window_height = 55
     also = malformed = line
     """
-    
+
     config.parse(configText)
-    
+
     assertEqual(config.windowWidth, 700, "Parsed window width ignoring malformed")
     assertEqual(config.windowHeight, 55, "Parsed window height ignoring malformed")
 }
@@ -354,9 +370,9 @@ func testMaxListHeightCalculation() {
     var config = Config()
     config.maxResults = 10
     config.listRowHeight = 28
-    
+
     assertEqual(config.maxListHeight, 280, "Calculated max list height for 10 results")
-    
+
     config.maxResults = 15
     assertEqual(config.maxListHeight, 420, "Calculated max list height for 15 results")
 }
@@ -365,15 +381,15 @@ func testNSColorHexInitializer() {
     // Test 6-digit hex
     let color1 = NSColor(hex: "#FF0000")
     assertNotNil(color1, "6-digit hex color")
-    
+
     // Test 8-digit hex (with alpha)
     let color2 = NSColor(hex: "#FF0000AA")
     assertNotNil(color2, "8-digit hex color with alpha")
-    
+
     // Test without hash
     let color3 = NSColor(hex: "00FF00")
     assertNotNil(color3, "Hex color without hash")
-    
+
     // Test invalid hex
     let color4 = NSColor(hex: "invalid")
     assertNil(color4, "Invalid hex should return nil")

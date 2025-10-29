@@ -246,15 +246,56 @@ yjump/
 │   ├── cli.swift       # Command-line argument parsing
 │   ├── conf.swift      # Configuration parsing
 │   └── main.swift      # Main application code
+├── tests/
+│   ├── ConfigTests.swift      # Configuration tests
+│   ├── FuzzyMatchTests.swift  # Fuzzy matching tests
+│   └── WindowInfoTests.swift  # Window info tests
 ├── bin/
-│   └── setup-hotkey.sh # Helper script for keyboard shortcut setup
+│   ├── setup-hotkey.sh        # Helper script for keyboard shortcut setup
+│   └── install-swiftformat.sh # SwiftFormat installer
 ├── man/
 │   └── yjump.1         # Man page
 ├── conf/
 │   └── yjump.conf      # Example configuration
+├── .swiftformat        # Code formatting rules
 ├── Makefile            # Build system with git versioning
+├── CONTRIBUTING.md     # Contribution guidelines
 └── README.md           # This file
 ```
+
+## Development
+
+### Code Formatting
+
+This project uses [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) to maintain consistent code style. Formatting happens automatically when you build:
+
+```bash
+make build  # Formats and builds
+```
+
+To install SwiftFormat:
+
+```bash
+make install-formatter
+```
+
+To format code manually:
+
+```bash
+make format
+```
+
+To check formatting (useful for CI):
+
+```bash
+make format-check
+```
+
+All formatting rules are defined in `.swiftformat` following Swift community best practices.
+
+### Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
 ## License
 

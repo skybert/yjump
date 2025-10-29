@@ -22,12 +22,15 @@ TEST_DIR = tests
 TEST_SOURCES = $(wildcard $(TEST_DIR)/*Tests.swift)
 TEST_BUILD_DIR = $(BUILD_DIR)/tests
 
-.PHONY: all build clean install uninstall test run help
+# Formatter
+SWIFTFORMAT := $(shell command -v swiftformat 2> /dev/null || echo "$(HOME)/.local/bin/swiftformat")
+
+.PHONY: all build clean install uninstall test run help format format-check install-formatter
 
 all: build
 
-# Build the application
-build: $(BUILD_DIR)/$(APP_NAME)
+# Format code before building
+build: format $(BUILD_DIR)/$(APP_NAME)
 
 $(BUILD_DIR)/$(APP_NAME): $(SOURCES) $(SRC_DIR)/cli.swift
 	@echo "Building $(APP_NAME) version $(GIT_VERSION)..."
@@ -108,10 +111,40 @@ help:
 	@echo "yjump - Fast window switcher for macOS"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  make build      - Build the application (default)"
-	@echo "  make run        - Build and run the application"
-	@echo "  make install    - Install to $(BIN_DIR)"
-	@echo "  make uninstall  - Remove installed files"
-	@echo "  make test       - Run tests"
-	@echo "  make clean      - Remove build artifacts"
-	@echo "  make help       - Show this help message"
+	@echo "  make build           - Format and build the application (default)"
+	@echo "  make run             - Build and run the application"
+	@echo "  make format          - Format Swift source files"
+	@echo "  make format-check    - Check if source files need formatting"
+	@echo "  make install         - Install to $(BIN_DIR)"
+	@echo "  make install-formatter - Install SwiftFormat tool"
+	@echo "  make uninstall       - Remove installed files"
+	@echo "  make test            - Run tests"
+	@echo "  make clean           - Remove build artifacts"
+	@echo "  make help            - Show this help message"
+
+# Format Swift source code
+format:
+	@if [ -x "$(SWIFTFORMAT)" ]; then \
+		echo "Formatting Swift source files..."; \
+		$(SWIFTFORMAT) $(SRC_DIR) $(TEST_DIR) --config .swiftformat 2>/dev/null || true; \
+	else \
+		echo "⚠️  SwiftFormat not found. Skipping formatting."; \
+		echo "   Run 'make install-formatter' to install SwiftFormat"; \
+	fi
+
+# Check if formatting is needed (for CI)
+format-check:
+	@if [ -x "$(SWIFTFORMAT)" ]; then \
+		echo "Checking Swift code formatting..."; \
+		$(SWIFTFORMAT) $(SRC_DIR) $(TEST_DIR) --config .swiftformat --lint || \
+		(echo "❌ Code formatting check failed. Run 'make format' to fix." && exit 1); \
+		echo "✅ Code formatting is correct"; \
+	else \
+		echo "⚠️  SwiftFormat not found. Skipping format check."; \
+		echo "   Run 'make install-formatter' to install SwiftFormat"; \
+	fi
+
+# Install SwiftFormat
+install-formatter:
+	@echo "Installing SwiftFormat..."
+	@bash bin/install-swiftformat.sh

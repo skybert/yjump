@@ -1,0 +1,77 @@
+# SwiftFormat configuration
+# This file defines the code style for the yjump project
+# Compatible with SwiftFormat 0.50.0+
+
+# Use the default Swift style guide rules
+--swiftversion 5.0
+
+# Indentation
+--indent 2
+--indentcase false
+--ifdef indent
+--xcodeindentation disabled
+
+# Spacing
+--trimwhitespace always
+--nospaceoperators ..<,...
+--ranges spaced
+
+# Wrapping
+--maxwidth 80
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--wrapternary before-operators
+
+# Blank lines
+--emptybraces linebreak
+--linebreaks lf
+
+# Comments
+--header strip
+
+# Organization
+--importgrouping testable-bottom
+--patternlet inline
+--sortimports alpha
+
+# File options
+--exclude build,.build,Package.swift
+
+# Rules to enable (explicit for clarity)
+--enable blankLinesAroundMark
+--enable blankLinesAtEndOfScope
+--enable blankLinesAtStartOfScope
+--enable blankLinesBetweenScopes
+--enable consecutiveBlankLines
+--enable duplicateImports
+--enable elseOnSameLine
+--enable emptyBraces
+--enable hoistPatternLet
+--enable indent
+--enable linebreakAtEndOfFile
+--enable sortImports
+--enable spaceAroundBraces
+--enable spaceAroundBrackets
+--enable spaceAroundComments
+--enable spaceAroundGenerics
+--enable spaceAroundOperators
+--enable spaceAroundParens
+--enable spaceInsideBraces
+--enable spaceInsideBrackets
+--enable spaceInsideComments
+--enable spaceInsideGenerics
+--enable spaceInsideParens
+--enable trailingCommas
+--enable trailingSpace
+--enable unusedArguments
+--enable void
+--enable wrapArguments
+--enable wrapAttributes
+
+# Disable some opinionated rules
+--disable andOperator
+--disable isEmpty
+--disable numberFormatting
+--disable strongOutlets
+--disable yodaConditions
