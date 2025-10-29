@@ -126,6 +126,44 @@ position = center
 - `cache_window_list` - Cache window list for faster performance (true/false)
 - `cache_timeout_seconds` - How long to cache window list in seconds (default: 2.0)
 
+## Keyboard Shortcut Setup
+
+macOS doesn't allow setting global hotkeys via command line, but yjump includes a helper script:
+
+```bash
+./bin/setup-hotkey.sh
+```
+
+This creates a macOS Quick Action that you can bind to a keyboard shortcut:
+
+1. Run the setup script above
+2. Open **System Preferences** → **Keyboard** → **Shortcuts**
+3. Select **Services** in the left sidebar
+4. Find **"yjump Launcher"** in the right panel
+5. Click it and press **Add Shortcut**
+6. Press your desired key combo (e.g., **Shift+Control+O**)
+
+### Alternative: Third-Party Tools
+
+For more control, use one of these:
+
+**Hammerspoon** (recommended - free & powerful):
+```lua
+-- Add to ~/.hammerspoon/init.lua
+hs.hotkey.bind({"shift", "ctrl"}, "o", function()
+    hs.execute("~/.local/bin/yjump")
+end)
+```
+
+**BetterTouchTool** (paid - most user-friendly):
+- Create global keyboard shortcut
+- Set action to "Run Shell Command"
+- Command: `~/.local/bin/yjump`
+
+**Karabiner-Elements** (free - advanced):
+- Complex keyboard customization
+- Requires more configuration
+
 ## Permissions
 
 yjump requires **Accessibility permissions** to function. On first run, macOS will prompt you to grant these permissions.
@@ -191,18 +229,30 @@ make test
 - Swift 5.0+
 - Xcode Command Line Tools
 
+## Command Line Options
+
+```bash
+yjump --help     # Show help message
+yjump --version  # Show version (from git tag/SHA)
+yjump -h         # Short form of --help
+yjump -v         # Short form of --version
+```
+
 ## Project Structure
 
 ```
 yjump/
 ├── src/
+│   ├── cli.swift       # Command-line argument parsing
 │   ├── conf.swift      # Configuration parsing
 │   └── main.swift      # Main application code
+├── bin/
+│   └── setup-hotkey.sh # Helper script for keyboard shortcut setup
 ├── man/
 │   └── yjump.1         # Man page
 ├── conf/
 │   └── yjump.conf      # Example configuration
-├── Makefile            # Build system
+├── Makefile            # Build system with git versioning
 └── README.md           # This file
 ```
 

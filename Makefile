@@ -12,7 +12,10 @@ MAN_INSTALL_DIR = $(INSTALL_PREFIX)/share/man/man1
 CONF_INSTALL_DIR = $(HOME)/.config/yjump
 
 SWIFT_FLAGS = -O
-SOURCES = $(SRC_DIR)/conf.swift $(SRC_DIR)/main.swift
+SOURCES = $(SRC_DIR)/cli.swift $(SRC_DIR)/conf.swift $(SRC_DIR)/main.swift
+
+# Get version from git
+GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 .PHONY: all build clean install uninstall test run help
 
@@ -22,9 +25,12 @@ all: build
 build: $(BUILD_DIR)/$(APP_NAME)
 
 $(BUILD_DIR)/$(APP_NAME): $(SOURCES)
-	@echo "Building $(APP_NAME)..."
+	@echo "Building $(APP_NAME) version $(GIT_VERSION)..."
 	@mkdir -p $(BUILD_DIR)
-	swiftc $(SWIFT_FLAGS) $(SOURCES) -o $(BUILD_DIR)/$(APP_NAME)
+	@# Create a temporary version file
+	@sed 's/GIT_VERSION_PLACEHOLDER/$(GIT_VERSION)/' $(SRC_DIR)/cli.swift > $(BUILD_DIR)/cli_versioned.swift
+	@swiftc $(SWIFT_FLAGS) $(BUILD_DIR)/cli_versioned.swift $(SRC_DIR)/conf.swift $(SRC_DIR)/main.swift -o $(BUILD_DIR)/$(APP_NAME)
+	@rm $(BUILD_DIR)/cli_versioned.swift
 	@echo "Build complete: $(BUILD_DIR)/$(APP_NAME)"
 
 # Run the application

@@ -140,21 +140,21 @@ class WindowManager {
                 
                 // Try to find matching AX window if no title
                 if windowTitle.isEmpty && !axWindowTitles.isEmpty {
-                    var bestMatch: (title: String, distance: CGFloat)?
+                    var bestMatch: (title: String, distance: CGFloat, bounds: CGRect)?
                     
                     for (axBounds, title) in axWindowTitles {
                         let distance = boundsDistance(cgBounds, axBounds)
-                        if distance < 50 {
+                        if distance < 100 { // Increased tolerance
                             if bestMatch == nil || distance < bestMatch!.distance {
-                                bestMatch = (title, distance)
+                                bestMatch = (title, distance, axBounds)
                             }
                         }
                     }
                     
                     if let match = bestMatch {
                         windowTitle = match.title
-                        // Remove from dict so it won't match again
-                        axWindowTitles = axWindowTitles.filter { boundsDistance(cgBounds, $0.key) >= 50 }
+                        // Remove the matched AX window so it won't be reused
+                        axWindowTitles.removeValue(forKey: match.bounds)
                     }
                 }
                 
@@ -642,6 +642,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var windowController: SearchWindowController?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Parse CLI arguments first
+        if CLI.parse() {
+            // CLI handled the request (--help or --version), exit
+            exit(0)
+        }
+        
         // Request accessibility permissions
         let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         let accessEnabled = AXIsProcessTrustedWithOptions(options)
