@@ -5,7 +5,7 @@ import Foundation
 
 public struct Config {
     var windowWidth: CGFloat = 600
-    var windowHeight: CGFloat = 50
+    var windowHeight: CGFloat = 60
     var backgroundColor: NSColor = .init(hex: "#24273A") ?? .darkGray
     var textColor: NSColor = .init(hex: "#CAD3F5") ?? .white
     var placeholderColor: NSColor = .init(hex: "#6E738D") ?? .gray
@@ -14,7 +14,7 @@ public struct Config {
     var borderWidth: CGFloat = 2
     var cornerRadius: CGFloat = 8
     var fontName: String = "Menlo"
-    var fontSize: CGFloat = 14
+    var fontSize: CGFloat = 20
     var maxResults: Int = 10
     var caseSensitive: Bool = false
     var position: String = "center"

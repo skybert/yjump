@@ -552,9 +552,9 @@ class SearchWindowController:
           x = CGFloat(xVal)
           y = CGFloat(yVal)
         } else {
-          // Default to Spotlight-like position: upper third of screen
+          // Default to Spotlight-like position: upper 20% of screen
           x = screenRect.midX - windowRect.width / 2
-          y = screenRect.maxY - (screenRect.height / 3)
+          y = screenRect.maxY - (screenRect.height * 0.2)
             - windowRect.height / 2
         }
       } else {
@@ -566,14 +566,14 @@ class SearchWindowController:
           x = screenRect.midX - windowRect.width / 2
           y = screenRect.minY + 50
         case "center":
-          // Spotlight-like position: upper third, centered horizontally
+          // Spotlight-like position: upper 20%, centered horizontally
           x = screenRect.midX - windowRect.width / 2
-          y = screenRect.maxY - (screenRect.height / 3)
+          y = screenRect.maxY - (screenRect.height * 0.2)
             - windowRect.height / 2
         default:
           // Default to Spotlight-like position
           x = screenRect.midX - windowRect.width / 2
-          y = screenRect.maxY - (screenRect.height / 3)
+          y = screenRect.maxY - (screenRect.height * 0.2)
             - windowRect.height / 2
         }
       }
