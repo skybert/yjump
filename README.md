@@ -9,7 +9,7 @@ A fast window switcher for macOS with fuzzy search, inspired by rofi on Linux/i3
 - **Cross-Workspace**: Jump to windows across all macOS Spaces/Desktops
 - **Keyboard-Driven**: Entirely controlled via keyboard for maximum efficiency
 - **Themeable**: Customize colors, fonts, size, and position via configuration file
-- **Fast**: Optimized Swift implementation for snappy performance
+- **Fast**: Optimized with window list caching and smart API usage
 - **XDG Compliant**: Configuration follows XDG Base Directory specification
 
 ## Installation
@@ -86,10 +86,10 @@ See `conf/yjump.conf` for a complete example with all available options:
 
 ```conf
 # Window appearance
-window_width = 600
+window_width = 700
 window_height = 50
 
-# Colors (hex format)
+# Colors (hex format - Nord theme)
 background_color = #2E3440
 text_color = #ECEFF4
 placeholder_color = #4C566A
@@ -102,7 +102,7 @@ corner_radius = 8
 
 # Font
 font_name = Menlo
-font_size = 16
+font_size = 14
 
 # Behavior
 max_results = 10
@@ -123,6 +123,8 @@ position = center
 - `max_results` - Maximum number of results to consider
 - `case_sensitive` - Enable case-sensitive search (true/false)
 - `position` - Window position: `center`, `top`, `bottom`, or `x,y` coordinates
+- `cache_window_list` - Cache window list for faster performance (true/false)
+- `cache_timeout_seconds` - How long to cache window list in seconds (default: 2.0)
 
 ## Permissions
 
@@ -131,6 +133,23 @@ yjump requires **Accessibility permissions** to function. On first run, macOS wi
 Alternatively, enable manually:
 1. Open **System Preferences** → **Security & Privacy** → **Privacy** → **Accessibility**
 2. Add yjump (or your terminal application) to the list
+
+### About Window Titles
+
+macOS has limitations on accessing window titles:
+- **Firefox**: Provides window titles ✅
+- **Chrome, Safari, Edge, Arc**: Typically don't expose individual window/tab titles ❌
+- **Terminal**: Shows window titles ✅
+- **Text Editors**: Usually show filenames ✅
+- yjump will show window titles when available, otherwise just the application name
+- Even with Accessibility permissions, some apps don't provide this information
+
+**What you'll see:**
+- **Firefox**: "Firefox: Page Title"
+- **Terminal**: "Terminal: bash" or "Terminal: [window title]"
+- **Chrome/Safari/Edge**: Usually just "Chrome", "Safari", etc. (per-tab titles not accessible)
+- **Text Editors**: Often shows the filename
+- **Other apps**: Varies by application
 
 ## Man Page
 
@@ -177,6 +196,7 @@ make test
 ```
 yjump/
 ├── src/
+│   ├── conf.swift      # Configuration parsing
 │   └── main.swift      # Main application code
 ├── man/
 │   └── yjump.1         # Man page

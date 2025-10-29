@@ -12,7 +12,7 @@ MAN_INSTALL_DIR = $(INSTALL_PREFIX)/share/man/man1
 CONF_INSTALL_DIR = $(HOME)/.config/yjump
 
 SWIFT_FLAGS = -O
-SOURCES = $(SRC_DIR)/main.swift
+SOURCES = $(SRC_DIR)/conf.swift $(SRC_DIR)/main.swift
 
 .PHONY: all build clean install uninstall test run help
 

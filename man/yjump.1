@@ -147,6 +147,12 @@ Enable case-sensitive search (true/false)
 .TP
 .B position = center
 Window position: center, top, bottom, or x,y coordinates (e.g., 100,100)
+.TP
+.B cache_window_list = true
+Enable window list caching for faster performance (true/false)
+.TP
+.B cache_timeout_seconds = 2.0
+How long to cache the window list in seconds before refreshing
 .SH PERMISSIONS
 .B yjump
 requires Accessibility permissions to function properly. On first run, macOS will prompt you to grant these permissions. You can also enable them manually:
@@ -199,9 +205,15 @@ Very small windows (< 50x50 pixels) are filtered out as they're likely not actua
 .IP \(bu 2
 System windows like "Window Server" and "Dock" are excluded from the list
 .IP \(bu 2
-Windows without titles show only the application name
+The search is case-insensitive by default
 .IP \(bu 2
-The search is case-insensitive
+macOS has limitations on window title access - some applications (Chrome, Safari, Edge, Arc) don't expose individual window/tab titles for security reasons
+.IP \(bu 2
+Firefox, Terminal, and many text editors do provide window titles
+.IP \(bu 2
+yjump will show window titles when available via the Accessibility API, otherwise just the application name
+.IP \(bu 2
+Even with Accessibility permissions enabled, some applications simply don't provide window title information
 .SH SEE ALSO
 .BR open (1),
 .BR osascript (1)

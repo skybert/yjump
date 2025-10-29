@@ -2,115 +2,6 @@ import Cocoa
 import ApplicationServices
 import Foundation
 
-// MARK: - Configuration
-struct Config {
-    var windowWidth: CGFloat = 600
-    var windowHeight: CGFloat = 50
-    var backgroundColor: NSColor = NSColor(hex: "#2E3440") ?? .darkGray
-    var textColor: NSColor = NSColor(hex: "#ECEFF4") ?? .white
-    var placeholderColor: NSColor = NSColor(hex: "#4C566A") ?? .gray
-    var selectionColor: NSColor = NSColor(hex: "#5E81AC") ?? .blue
-    var borderColor: NSColor = NSColor(hex: "#3B4252") ?? .gray
-    var borderWidth: CGFloat = 2
-    var cornerRadius: CGFloat = 8
-    var fontName: String = "Menlo"
-    var fontSize: CGFloat = 16
-    var maxResults: Int = 10
-    var caseSensitive: Bool = false
-    var position: String = "center"
-    
-    static func load() -> Config {
-        var config = Config()
-        
-        // XDG config locations
-        let configPaths = [
-            ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"].map { "\($0)/yjump/yjump.conf" },
-            "\(NSHomeDirectory())/.config/yjump/yjump.conf",
-            "\(NSHomeDirectory())/.yjump.conf"
-        ].compactMap { $0 }
-        
-        for path in configPaths {
-            if let contents = try? String(contentsOfFile: path, encoding: .utf8) {
-                config.parse(contents)
-                break
-            }
-        }
-        
-        return config
-    }
-    
-    mutating func parse(_ contents: String) {
-        for line in contents.components(separatedBy: .newlines) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty || trimmed.hasPrefix("#") {
-                continue
-            }
-            
-            let parts = trimmed.components(separatedBy: "=").map { $0.trimmingCharacters(in: .whitespaces) }
-            guard parts.count == 2 else { continue }
-            
-            let key = parts[0]
-            let value = parts[1]
-            
-            switch key {
-            case "window_width":
-                if let val = Double(value) { windowWidth = CGFloat(val) }
-            case "window_height":
-                if let val = Double(value) { windowHeight = CGFloat(val) }
-            case "background_color":
-                if let color = NSColor(hex: value) { backgroundColor = color }
-            case "text_color":
-                if let color = NSColor(hex: value) { textColor = color }
-            case "placeholder_color":
-                if let color = NSColor(hex: value) { placeholderColor = color }
-            case "selection_color":
-                if let color = NSColor(hex: value) { selectionColor = color }
-            case "border_color":
-                if let color = NSColor(hex: value) { borderColor = color }
-            case "border_width":
-                if let val = Double(value) { borderWidth = CGFloat(val) }
-            case "corner_radius":
-                if let val = Double(value) { cornerRadius = CGFloat(val) }
-            case "font_name":
-                fontName = value
-            case "font_size":
-                if let val = Double(value) { fontSize = CGFloat(val) }
-            case "max_results":
-                if let val = Int(value) { maxResults = val }
-            case "case_sensitive":
-                caseSensitive = value.lowercased() == "true"
-            case "position":
-                position = value
-            default:
-                break
-            }
-        }
-    }
-}
-
-extension NSColor {
-    convenience init?(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let r, g, b, a: UInt64
-        switch hex.count {
-        case 6: // RGB
-            (r, g, b, a) = (int >> 16, int >> 8 & 0xFF, int & 0xFF, 255)
-        case 8: // RGBA
-            (r, g, b, a) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            return nil
-        }
-        self.init(
-            red: CGFloat(r) / 255,
-            green: CGFloat(g) / 255,
-            blue: CGFloat(b) / 255,
-            alpha: CGFloat(a) / 255
-        )
-    }
-}
-
 // MARK: - Window Information
 struct WindowInfo {
     let windowNumber: CGWindowID
@@ -124,7 +15,7 @@ struct WindowInfo {
         if windowTitle.isEmpty {
             return ownerName
         }
-        return "\(ownerName) - \(windowTitle)"
+        return "\(ownerName): \(windowTitle)"
     }
     
     var searchableText: String {
@@ -172,7 +63,23 @@ func fuzzyMatch(_ pattern: String, _ text: String, caseSensitive: Bool = false) 
 
 // MARK: - Window Manager
 class WindowManager {
-    static func getAllWindows() -> [WindowInfo] {
+    private static var cachedWindows: [WindowInfo]?
+    private static var cacheTimestamp: Date?
+    private static var cacheTimeout: TimeInterval = 2.0
+    
+    static func setCacheTimeout(_ timeout: TimeInterval) {
+        cacheTimeout = timeout
+    }
+    
+    static func getAllWindows(useCache: Bool = true) -> [WindowInfo] {
+        // Check cache if enabled
+        if useCache, let cached = cachedWindows, let timestamp = cacheTimestamp {
+            let elapsed = Date().timeIntervalSince(timestamp)
+            if elapsed < cacheTimeout {
+                return cached
+            }
+        }
+        
         var windows: [WindowInfo] = []
         
         guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
@@ -187,10 +94,10 @@ class WindowManager {
             }
             
             let ownerName = windowDict[kCGWindowOwnerName as String] as? String ?? ""
-            let windowTitle = windowDict[kCGWindowName as String] as? String ?? ""
+            var windowTitle = windowDict[kCGWindowName as String] as? String ?? ""
             
-            // Skip windows without a name and title
-            if ownerName.isEmpty && windowTitle.isEmpty {
+            // Skip windows without a name
+            if ownerName.isEmpty {
                 continue
             }
             
@@ -211,6 +118,13 @@ class WindowManager {
                 continue
             }
             
+            // Try to get window title from Accessibility API if not available
+            // Skip AX lookup for browsers that typically don't provide individual tab titles
+            let skipAXLookup = ["Google Chrome", "Safari", "Arc", "Microsoft Edge"]
+            if windowTitle.isEmpty && !skipAXLookup.contains(ownerName) {
+                windowTitle = getWindowTitleViaAX(pid: ownerPID, bounds: bounds) ?? ""
+            }
+            
             // Note: kCGWindowWorkspace is deprecated, using 0 as default
             let workspace = 0
             
@@ -224,7 +138,66 @@ class WindowManager {
             ))
         }
         
+        // Update cache
+        if useCache {
+            cachedWindows = windows
+            cacheTimestamp = Date()
+        }
+        
         return windows
+    }
+    
+    static func invalidateCache() {
+        cachedWindows = nil
+        cacheTimestamp = nil
+    }
+    
+    static func getWindowTitleViaAX(pid: pid_t, bounds: CGRect) -> String? {
+        let appElement = AXUIElementCreateApplication(pid)
+        var windowsRef: AnyObject?
+        
+        let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef)
+        
+        guard result == .success, let windows = windowsRef as? [AXUIElement] else {
+            return nil
+        }
+        
+        // Try to match window by bounds
+        for axWindow in windows {
+            var posRef: AnyObject?
+            var sizeRef: AnyObject?
+            
+            let posResult = AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &posRef)
+            let sizeResult = AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &sizeRef)
+            
+            if posResult == .success, sizeResult == .success,
+               let posValue = posRef as CFTypeRef?, let sizeValue = sizeRef as CFTypeRef? {
+                var point = CGPoint.zero
+                var size = CGSize.zero
+                
+                if AXValueGetValue(posValue as! AXValue, .cgPoint, &point),
+                   AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) {
+                    
+                    // Check if bounds match (with tolerance for slight differences)
+                    let tolerance: CGFloat = 10
+                    let xMatch = abs(point.x - bounds.origin.x) < tolerance
+                    let yMatch = abs(point.y - bounds.origin.y) < tolerance
+                    let widthMatch = abs(size.width - bounds.width) < tolerance
+                    let heightMatch = abs(size.height - bounds.height) < tolerance
+                    
+                    if xMatch && yMatch && widthMatch && heightMatch {
+                        // Found matching window, get its title
+                        var titleRef: AnyObject?
+                        if AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleRef) == .success,
+                           let title = titleRef as? String, !title.isEmpty {
+                            return title
+                        }
+                    }
+                }
+            }
+        }
+        
+        return nil
     }
     
     static func activateWindow(_ window: WindowInfo) {
@@ -360,10 +333,6 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
     var selectedIndex: Int = 0
     var config: Config
     
-    let rowHeight: CGFloat = 30
-    let maxVisibleRows: Int = 10
-    let padding: CGFloat = 12
-    
     init(config: Config) {
         self.config = config
         super.init(window: nil)
@@ -374,6 +343,7 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
     }
     
     override func loadWindow() {
+        // Start with just input box height
         let window = BorderedWindow(config: config, height: config.windowHeight)
         self.window = window
         
@@ -429,10 +399,10 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
         searchField.placeholderString = "Search windows..."
         searchField.delegate = self
         searchField.frame = NSRect(
-            x: padding,
-            y: window.frame.height - config.windowHeight + padding,
-            width: config.windowWidth - (padding * 2),
-            height: config.windowHeight - (padding * 2)
+            x: config.inputPadding,
+            y: window.frame.height - config.windowHeight + config.inputPadding,
+            width: config.windowWidth - (config.inputPadding * 2),
+            height: config.windowHeight - (config.inputPadding * 2)
         )
         
         // Table view for results
@@ -442,12 +412,12 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
         tableView.headerView = nil
         tableView.backgroundColor = .clear
         tableView.selectionHighlightStyle = .regular
-        tableView.rowHeight = rowHeight
-        tableView.intercellSpacing = NSSize(width: 0, height: 0)
+        tableView.rowHeight = config.listRowHeight
+        tableView.intercellSpacing = NSSize(width: 0, height: 2)
         tableView.focusRingType = .none
         
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("WindowColumn"))
-        column.width = config.windowWidth - (padding * 2)
+        column.width = config.windowWidth - (config.inputPadding * 2)
         tableView.addTableColumn(column)
         
         // Scroll view
@@ -460,14 +430,14 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
         scrollView.backgroundColor = .clear
         scrollView.drawsBackground = false
         scrollView.frame = NSRect(
-            x: padding,
-            y: padding,
-            width: config.windowWidth - (padding * 2),
+            x: config.inputPadding,
+            y: config.inputPadding,
+            width: config.windowWidth - (config.inputPadding * 2),
             height: 0
         )
         
-        containerView.addSubview(searchField)
         containerView.addSubview(scrollView)
+        containerView.addSubview(searchField)
         
         window.contentView = containerView
         
@@ -478,18 +448,22 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
     }
     
     func loadWindows() {
-        allWindows = WindowManager.getAllWindows()
+        // Configure cache settings
+        WindowManager.setCacheTimeout(config.cacheTimeoutSeconds)
+        
+        // Load windows (will use cache if enabled)
+        allWindows = WindowManager.getAllWindows(useCache: config.cacheWindowList)
         filteredWindows = []
-        updateWindowSize()
     }
     
     func updateWindowSize() {
         guard let window = self.window else { return }
         
-        let visibleRowCount = min(filteredWindows.count, maxVisibleRows)
-        let listHeight = CGFloat(visibleRowCount) * rowHeight
+        let hasResults = !filteredWindows.isEmpty
+        let listHeight = hasResults ? config.maxListHeight : 0
+        let spacing: CGFloat = hasResults ? config.inputPadding : 0
         
-        let newHeight = config.windowHeight + listHeight + (filteredWindows.isEmpty ? 0 : padding)
+        let newHeight = config.windowHeight + listHeight + spacing
         
         var frame = window.frame
         let oldHeight = frame.height
@@ -500,18 +474,18 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
         
         // Update scroll view frame
         scrollView.frame = NSRect(
-            x: padding,
-            y: padding,
-            width: config.windowWidth - (padding * 2),
+            x: config.inputPadding,
+            y: config.inputPadding,
+            width: config.windowWidth - (config.inputPadding * 2),
             height: listHeight
         )
         
         // Update search field frame
         searchField.frame = NSRect(
-            x: padding,
-            y: newHeight - config.windowHeight + padding,
-            width: config.windowWidth - (padding * 2),
-            height: config.windowHeight - (padding * 2)
+            x: config.inputPadding,
+            y: newHeight - config.windowHeight + config.inputPadding,
+            width: config.windowWidth - (config.inputPadding * 2),
+            height: config.windowHeight - (config.inputPadding * 2)
         )
     }
     
@@ -603,7 +577,7 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
             textField.isEditable = false
             textField.backgroundColor = .clear
             textField.textColor = config.textColor
-            textField.font = NSFont(name: config.fontName, size: config.fontSize - 2) ?? NSFont.systemFont(ofSize: config.fontSize - 2)
+            textField.font = NSFont(name: config.fontName, size: config.fontSize - 1) ?? NSFont.systemFont(ofSize: config.fontSize - 1)
             textField.lineBreakMode = .byTruncatingTail
             textField.translatesAutoresizingMaskIntoConstraints = false
             cell?.addSubview(textField)
