@@ -17,6 +17,11 @@ SOURCES = $(SRC_DIR)/cli.swift $(SRC_DIR)/conf.swift $(SRC_DIR)/main.swift
 # Get version from git
 GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
+# Test settings
+TEST_DIR = tests
+TEST_SOURCES = $(wildcard $(TEST_DIR)/*Tests.swift)
+TEST_BUILD_DIR = $(BUILD_DIR)/tests
+
 .PHONY: all build clean install uninstall test run help
 
 all: build
@@ -24,13 +29,14 @@ all: build
 # Build the application
 build: $(BUILD_DIR)/$(APP_NAME)
 
-$(BUILD_DIR)/$(APP_NAME): $(SOURCES)
+$(BUILD_DIR)/$(APP_NAME): $(SOURCES) $(SRC_DIR)/cli.swift
 	@echo "Building $(APP_NAME) version $(GIT_VERSION)..."
 	@mkdir -p $(BUILD_DIR)
 	@# Create a temporary version file
-	@sed 's/GIT_VERSION_PLACEHOLDER/$(GIT_VERSION)/' $(SRC_DIR)/cli.swift > $(BUILD_DIR)/cli_versioned.swift
+	@sed 's/GIT_VERSION_PLACEHOLDER/$(GIT_VERSION)/' $(SRC_DIR)/cli.swift > $(BUILD_DIR)/cli_versioned.swift.tmp
+	@mv $(BUILD_DIR)/cli_versioned.swift.tmp $(BUILD_DIR)/cli_versioned.swift
 	@swiftc $(SWIFT_FLAGS) $(BUILD_DIR)/cli_versioned.swift $(SRC_DIR)/conf.swift $(SRC_DIR)/main.swift -o $(BUILD_DIR)/$(APP_NAME)
-	@rm $(BUILD_DIR)/cli_versioned.swift
+	@rm -f $(BUILD_DIR)/cli_versioned.swift
 	@echo "Build complete: $(BUILD_DIR)/$(APP_NAME)"
 
 # Run the application
@@ -71,7 +77,19 @@ uninstall:
 # Run tests (placeholder for future tests)
 test:
 	@echo "Running tests..."
-	@echo "No tests defined yet"
+	@if [ -z "$(TEST_SOURCES)" ]; then \
+		echo "No tests defined yet"; \
+	else \
+		mkdir -p $(TEST_BUILD_DIR); \
+		echo "Building and running ConfigTests..."; \
+		swift tests/ConfigTests.swift && \
+		echo "Building and running FuzzyMatchTests..."; \
+		swift tests/FuzzyMatchTests.swift && \
+		echo "Building and running WindowInfoTests..."; \
+		swift tests/WindowInfoTests.swift && \
+		echo ""; \
+		echo "All tests passed!"; \
+	fi
 
 # Clean build artifacts
 clean:

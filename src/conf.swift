@@ -5,11 +5,11 @@ import Foundation
 public struct Config {
     var windowWidth: CGFloat = 600
     var windowHeight: CGFloat = 50
-    var backgroundColor: NSColor = NSColor(hex: "#2E3440") ?? .darkGray
-    var textColor: NSColor = NSColor(hex: "#ECEFF4") ?? .white
-    var placeholderColor: NSColor = NSColor(hex: "#4C566A") ?? .gray
-    var selectionColor: NSColor = NSColor(hex: "#5E81AC") ?? .blue
-    var borderColor: NSColor = NSColor(hex: "#3B4252") ?? .gray
+    var backgroundColor: NSColor = NSColor(hex: "#24273A") ?? .darkGray
+    var textColor: NSColor = NSColor(hex: "#CAD3F5") ?? .white
+    var placeholderColor: NSColor = NSColor(hex: "#6E738D") ?? .gray
+    var selectionColor: NSColor = NSColor(hex: "#8AADF4") ?? .blue
+    var borderColor: NSColor = NSColor(hex: "#5B6078") ?? .gray
     var borderWidth: CGFloat = 2
     var cornerRadius: CGFloat = 8
     var fontName: String = "Menlo"
@@ -17,6 +17,7 @@ public struct Config {
     var maxResults: Int = 10
     var caseSensitive: Bool = false
     var position: String = "center"
+    var opacity: CGFloat = 0.95
     
     // UI sizing
     var listRowHeight: CGFloat = 28
@@ -95,6 +96,8 @@ public struct Config {
                 cacheWindowList = value.lowercased() == "true"
             case "cache_timeout_seconds":
                 if let val = Double(value) { cacheTimeoutSeconds = val }
+            case "opacity":
+                if let val = Double(value) { opacity = CGFloat(val) }
             default:
                 break
             }

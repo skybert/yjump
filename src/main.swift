@@ -338,7 +338,7 @@ class BorderedContentView: NSView {
         
         guard let layer = self.layer else { return }
         
-        layer.backgroundColor = config.backgroundColor.cgColor
+        layer.backgroundColor = config.backgroundColor.withAlphaComponent(config.opacity).cgColor
         layer.cornerRadius = config.cornerRadius
         layer.borderWidth = config.borderWidth
         layer.borderColor = config.borderColor.cgColor
@@ -645,6 +645,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Parse CLI arguments first
         if CLI.parse() {
             // CLI handled the request (--help or --version), exit
+            exit(0)
+        }
+        
+        // Check for running instance of yjump
+        let runningApps = NSWorkspace.shared.runningApplications
+        let yjumpInstances = runningApps.filter { app in
+            if let bundleId = app.bundleIdentifier {
+                return bundleId.contains("yjump")
+            }
+            // Also check by executable name
+            let execName = app.executableURL?.lastPathComponent ?? ""
+            return execName == "yjump"
+        }
+        
+        // If there are other instances (more than just this one), terminate
+        if yjumpInstances.count > 1 {
+            // Try to activate the existing instance
+            for app in yjumpInstances {
+                if app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+                    app.activate()
+                    break
+                }
+            }
             exit(0)
         }
         
