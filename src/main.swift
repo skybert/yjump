@@ -79,8 +79,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 // MARK: - Main Entry Point
 
 func main() {
+  // Load config early to determine activation policy
+  let config = Config.load()
+
   let app = NSApplication.shared
-  app.setActivationPolicy(.accessory)  // Don't show in Dock
+  // Set activation policy based on config
+  if config.hideFromDock {
+    app.setActivationPolicy(.accessory)  // Don't show in Dock
+  } else {
+    app.setActivationPolicy(.regular)  // Show in Dock and app switcher
+  }
+
   let delegate = AppDelegate()
   app.delegate = delegate
   app.run()

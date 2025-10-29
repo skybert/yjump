@@ -31,6 +31,9 @@ public struct Config {
     var cacheWindowList: Bool = true
     var cacheTimeoutSeconds: Double = 2.0
 
+    // Application behavior
+    var hideFromDock: Bool = true
+
     public static func load() -> Config {
         var config = Config()
 
@@ -99,6 +102,8 @@ public struct Config {
                 if let val = Double(value) { cacheTimeoutSeconds = val }
             case "opacity":
                 if let val = Double(value) { opacity = CGFloat(val) }
+            case "hide_from_dock":
+                hideFromDock = value.lowercased() == "true"
             default:
                 break
             }

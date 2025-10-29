@@ -531,6 +531,27 @@ class SearchWindowController:
     setupUI()
     loadWindows()
     positionWindow(window)
+
+    // Always monitor focus loss and close when it happens
+    setupFocusMonitoring()
+  }
+
+  func setupFocusMonitoring() {
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(windowDidResignKey(_:)),
+      name: NSWindow.didResignKeyNotification,
+      object: window
+    )
+  }
+
+  @objc func windowDidResignKey(_: Notification) {
+    // Close yjump when window loses focus
+    NSApplication.shared.terminate(nil)
+  }
+
+  deinit {
+    NotificationCenter.default.removeObserver(self)
   }
 
   func positionWindow(_ window: NSWindow) {
