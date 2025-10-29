@@ -4,7 +4,7 @@ import Foundation
 var testsPassed = 0
 var testsFailed = 0
 
-func assert(_ condition: Bool, _ message: String = "", file: String = #file, line: Int = #line) {
+func assertTest(_ condition: Bool, _ message: String = "", file: String = #file, line: Int = #line) {
     if condition {
         testsPassed += 1
     } else {
@@ -92,13 +92,13 @@ print("Running Fuzzy Match Tests...")
 
 func testEmptyPattern() {
     let result = fuzzyMatch("", "any text")
-    assert(result.matches, "Empty pattern should match")
+    assertTest(result.matches, "Empty pattern should match")
     assertEqual(result.score, 0, "Empty pattern score should be 0")
 }
 
 func testExactSubstringMatch() {
     let result = fuzzyMatch("fox", "the quick brown fox jumps")
-    assert(result.matches, "Should match exact substring")
+    assertTest(result.matches, "Should match exact substring")
     assertGreaterThan(result.score, 0, "Match should have positive score")
 }
 
@@ -106,8 +106,8 @@ func testSubstringMatchAtBeginning() {
     let result1 = fuzzyMatch("the", "the quick brown fox")
     let result2 = fuzzyMatch("fox", "the quick brown fox")
     
-    assert(result1.matches, "Should match at beginning")
-    assert(result2.matches, "Should match later in string")
+    assertTest(result1.matches, "Should match at beginning")
+    assertTest(result2.matches, "Should match later in string")
     
     // Match at beginning should have higher score
     assertGreaterThan(result1.score, result2.score, "Earlier match should score higher")
@@ -118,22 +118,22 @@ func testCaseInsensitiveByDefault() {
     let result2 = fuzzyMatch("firefox", "FIREFOX")
     let result3 = fuzzyMatch("FiReFoX", "firefox")
     
-    assert(result1.matches, "Should match case insensitive (upper to lower)")
-    assert(result2.matches, "Should match case insensitive (lower to upper)")
-    assert(result3.matches, "Should match case insensitive (mixed)")
+    assertTest(result1.matches, "Should match case insensitive (upper to lower)")
+    assertTest(result2.matches, "Should match case insensitive (lower to upper)")
+    assertTest(result3.matches, "Should match case insensitive (mixed)")
 }
 
 func testCaseSensitiveMode() {
     let result1 = fuzzyMatch("Firefox", "firefox", caseSensitive: true)
     let result2 = fuzzyMatch("firefox", "firefox", caseSensitive: true)
     
-    assert(!result1.matches, "Should not match with wrong case")
-    assert(result2.matches, "Should match with correct case")
+    assertTest(!result1.matches, "Should not match with wrong case")
+    assertTest(result2.matches, "Should match with correct case")
 }
 
 func testFuzzyMatchingWithGaps() {
     let result = fuzzyMatch("gchr", "google chrome")
-    assert(result.matches, "Should fuzzy match with gaps")
+    assertTest(result.matches, "Should fuzzy match with gaps")
     assertGreaterThan(result.score, 0, "Fuzzy match should have positive score")
 }
 
@@ -142,8 +142,8 @@ func testFuzzyMatchingConsecutiveLetters() {
     let result1 = fuzzyMatch("chr", "chrome browser")
     let result2 = fuzzyMatch("cbr", "chrome browser")
     
-    assert(result1.matches, "Should match consecutive letters")
-    assert(result2.matches, "Should match non-consecutive letters")
+    assertTest(result1.matches, "Should match consecutive letters")
+    assertTest(result2.matches, "Should match non-consecutive letters")
     
     // "chr" is consecutive in "chrome", so should score higher
     assertGreaterThan(result1.score, result2.score, "Consecutive match should score higher")
@@ -151,30 +151,30 @@ func testFuzzyMatchingConsecutiveLetters() {
 
 func testNoMatch() {
     let result = fuzzyMatch("xyz", "abc def")
-    assert(!result.matches, "Should not match unrelated pattern")
+    assertTest(!result.matches, "Should not match unrelated pattern")
     assertEqual(result.score, 0, "No match should have zero score")
 }
 
 func testPartialNoMatch() {
     let result = fuzzyMatch("abcd", "abc")
-    assert(!result.matches, "Should not match if pattern longer than text")
+    assertTest(!result.matches, "Should not match if pattern longer than text")
     assertEqual(result.score, 0, "Partial match should have zero score")
 }
 
 func testSingleCharacterMatch() {
     let result = fuzzyMatch("f", "firefox")
-    assert(result.matches, "Should match single character")
+    assertTest(result.matches, "Should match single character")
     assertGreaterThan(result.score, 0, "Single char match should have positive score")
 }
 
 func testWhitespaceHandling() {
     let result = fuzzyMatch("go ch", "google chrome")
-    assert(result.matches, "Should handle whitespace in pattern")
+    assertTest(result.matches, "Should handle whitespace in pattern")
 }
 
 func testSpecialCharacters() {
     let result = fuzzyMatch("c++", "visual studio c++")
-    assert(result.matches, "Should handle special characters")
+    assertTest(result.matches, "Should handle special characters")
 }
 
 func testApplicationNameMatching() {
@@ -198,8 +198,8 @@ func testWindowTitleMatching() {
     let result1 = fuzzyMatch("readme", "README.md - Visual Studio Code")
     let result2 = fuzzyMatch("code", "README.md - Visual Studio Code")
     
-    assert(result1.matches, "Should match readme in title")
-    assert(result2.matches, "Should match code in title")
+    assertTest(result1.matches, "Should match readme in title")
+    assertTest(result2.matches, "Should match code in title")
 }
 
 func testScoreComparison() {
@@ -209,9 +209,9 @@ func testScoreComparison() {
     let result2 = fuzzyMatch("dev", text)
     let result3 = fuzzyMatch("edit", text)
     
-    assert(result1.matches, "Should match 'fire'")
-    assert(result2.matches, "Should match 'dev'")
-    assert(result3.matches, "Should match 'edit'")
+    assertTest(result1.matches, "Should match 'fire'")
+    assertTest(result2.matches, "Should match 'dev'")
+    assertTest(result3.matches, "Should match 'edit'")
     
     // "fire" appears first, should score highest
     assertGreaterThan(result1.score, result2.score, "'fire' should score higher than 'dev'")
@@ -220,17 +220,17 @@ func testScoreComparison() {
 
 func testUnicodeCharacters() {
     let result = fuzzyMatch("café", "café editor")
-    assert(result.matches, "Should handle unicode characters")
+    assertTest(result.matches, "Should handle unicode characters")
 }
 
 func testNumbers() {
     let result = fuzzyMatch("v2", "Firefox v2.0")
-    assert(result.matches, "Should match numbers")
+    assertTest(result.matches, "Should match numbers")
 }
 
 func testLongPattern() {
     let result = fuzzyMatch("visual studio code", "Visual Studio Code - README.md")
-    assert(result.matches, "Should match long patterns")
+    assertTest(result.matches, "Should match long patterns")
 }
 
 // Run all tests

@@ -51,7 +51,13 @@ install: build
 	@mkdir -p $(MAN_INSTALL_DIR)
 	@mkdir -p $(CONF_INSTALL_DIR)
 	@install -m 755 $(BUILD_DIR)/$(APP_NAME) $(BIN_DIR)/$(APP_NAME)
-	@install -m 644 $(MAN_DIR)/$(APP_NAME).1 $(MAN_INSTALL_DIR)/$(APP_NAME).1
+	@# Process man page to replace AUTHORS placeholder
+	@if [ -f AUTHORS ]; then \
+		sed "s/AUTHORS_FILE_CONTENTS/$$(sed 's/\//\\\//g; s/&/\\&/g' AUTHORS | tr '\n' '|' | sed 's/|$$//' | sed 's/|/\\n.br\\n/g')/" $(MAN_DIR)/$(APP_NAME).1 > $(MAN_INSTALL_DIR)/$(APP_NAME).1; \
+	else \
+		cp $(MAN_DIR)/$(APP_NAME).1 $(MAN_INSTALL_DIR)/$(APP_NAME).1; \
+	fi
+	@chmod 644 $(MAN_INSTALL_DIR)/$(APP_NAME).1
 	@if [ ! -f $(CONF_INSTALL_DIR)/$(APP_NAME).conf ]; then \
 		install -m 644 $(CONF_DIR)/$(APP_NAME).conf $(CONF_INSTALL_DIR)/$(APP_NAME).conf; \
 		echo "Installed config file to $(CONF_INSTALL_DIR)/$(APP_NAME).conf"; \

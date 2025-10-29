@@ -392,8 +392,9 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
                     x = CGFloat(xVal)
                     y = CGFloat(yVal)
                 } else {
+                    // Default to Spotlight-like position: upper third of screen
                     x = screenRect.midX - windowRect.width / 2
-                    y = screenRect.midY - windowRect.height / 2
+                    y = screenRect.maxY - (screenRect.height / 3) - windowRect.height / 2
                 }
             } else {
                 switch config.position {
@@ -403,9 +404,14 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
                 case "bottom":
                     x = screenRect.midX - windowRect.width / 2
                     y = screenRect.minY + 50
-                default:
+                case "center":
+                    // Spotlight-like position: upper third of screen, centered horizontally
                     x = screenRect.midX - windowRect.width / 2
-                    y = screenRect.midY - windowRect.height / 2
+                    y = screenRect.maxY - (screenRect.height / 3) - windowRect.height / 2
+                default:
+                    // Default to Spotlight-like position
+                    x = screenRect.midX - windowRect.width / 2
+                    y = screenRect.maxY - (screenRect.height / 3) - windowRect.height / 2
                 }
             }
             

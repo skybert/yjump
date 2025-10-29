@@ -5,7 +5,7 @@ import Foundation
 var testsPassed = 0
 var testsFailed = 0
 
-func assert(_ condition: Bool, _ message: String = "", file: String = #file, line: Int = #line) {
+func assertTest(_ condition: Bool, _ message: String = "", file: String = #file, line: Int = #line) {
     if condition {
         testsPassed += 1
     } else {
@@ -236,8 +236,8 @@ func testParseColors() {
     config.parse(configText)
     
     // Colors should be parsed and set
-    assert(config.backgroundColor != NSColor.darkGray, "Background color should be parsed")
-    assert(config.textColor != NSColor.white, "Text color should be parsed")
+    assertTest(config.backgroundColor != NSColor.darkGray, "Background color should be parsed")
+    assertTest(config.textColor != NSColor.white, "Text color should be parsed")
 }
 
 func testParseBorderAndRadius() {
