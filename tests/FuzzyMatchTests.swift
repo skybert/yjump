@@ -72,33 +72,57 @@ func fuzzyMatch(_ pattern: String, _ text: String, caseSensitive: Bool = false) 
         return (true, 0)
     }
 
-    // Simple substring matching - matches any part of the text
+    // 1. Exact substring match - highest priority
     if textToSearch.contains(patternToSearch) {
-        // Score based on position (earlier match = higher score)
         if let range = textToSearch.range(of: patternToSearch) {
             let position = textToSearch.distance(from: textToSearch.startIndex, to: range.lowerBound)
-            let score = 1000 - position
+            // Higher score for exact matches, even higher if at start
+            let score = 10000 - position
             return (true, score)
         }
     }
 
-    // Fuzzy matching fallback
-    var patternIndex = patternToSearch.startIndex
-    var score = 0
-    var consecutiveMatch = 0
-
-    for (_, char) in textToSearch.enumerated() {
-        if patternIndex < patternToSearch.endIndex && char == patternToSearch[patternIndex] {
-            score += 1 + consecutiveMatch * 5
-            consecutiveMatch += 1
-            patternIndex = patternToSearch.index(after: patternIndex)
-        } else {
-            consecutiveMatch = 0
+    // 2. Word boundary matches - medium priority
+    // Match pattern at start of words in the text
+    let words = textToSearch.components(separatedBy: .whitespacesAndNewlines)
+    for (wordIndex, word) in words.enumerated() {
+        if word.hasPrefix(patternToSearch) {
+            // Score based on word position (earlier is better)
+            let score = 5000 - (wordIndex * 100)
+            return (true, score)
+        }
+        // Also check if word contains the pattern as substring
+        if word.contains(patternToSearch) {
+            let score = 3000 - (wordIndex * 100)
+            return (true, score)
         }
     }
 
-    let matches = patternIndex == patternToSearch.endIndex
-    return (matches, matches ? score : 0)
+    // 3. Consecutive character matching - low priority
+    // Only match if characters appear consecutively in individual words
+    for word in words {
+        var patternIndex = patternToSearch.startIndex
+        var consecutiveCount = 0
+
+        for char in word {
+            if patternIndex < patternToSearch.endIndex && char == patternToSearch[patternIndex] {
+                consecutiveCount += 1
+                patternIndex = patternToSearch.index(after: patternIndex)
+            } else if consecutiveCount > 0 {
+                // Reset if we break the sequence
+                patternIndex = patternToSearch.startIndex
+                consecutiveCount = 0
+            }
+        }
+
+        // Only match if we found all characters consecutively in a word
+        if patternIndex == patternToSearch.endIndex {
+            return (true, 1000 + consecutiveCount * 10)
+        }
+    }
+
+    // No match found
+    return (false, 0)
 }
 
 // MARK: - Tests
@@ -147,21 +171,45 @@ func testCaseSensitiveMode() {
 }
 
 func testFuzzyMatchingWithGaps() {
+    // "gchr" should NOT match "google chrome" (too scattered)
     let result = fuzzyMatch("gchr", "google chrome")
-    assertTest(result.matches, "Should fuzzy match with gaps")
-    assertGreaterThan(result.score, 0, "Fuzzy match should have positive score")
+    assertTest(!result.matches, "Should NOT match scattered letters across words")
 }
 
 func testFuzzyMatchingConsecutiveLetters() {
-    // Consecutive matches should score higher
+    // "chr" should match "chrome browser" (consecutive in word)
     let result1 = fuzzyMatch("chr", "chrome browser")
-    let result2 = fuzzyMatch("cbr", "chrome browser")
+    let result2 = fuzzyMatch("bro", "chrome browser")
 
-    assertTest(result1.matches, "Should match consecutive letters")
-    assertTest(result2.matches, "Should match non-consecutive letters")
+    assertTest(result1.matches, "Should match consecutive letters in word")
+    assertTest(result2.matches, "Should match consecutive letters in word")
 
-    // "chr" is consecutive in "chrome", so should score higher
-    assertGreaterThan(result1.score, result2.score, "Consecutive match should score higher")
+    // "chr" appears in first word, "bro" in second
+    assertGreaterThan(result1.score, result2.score, "Earlier word match should score higher")
+}
+
+func testNoMatchScatteredLetters() {
+    // "kitty" should NOT match "karl in this true year"
+    let result = fuzzyMatch("kitty", "karl in this true year")
+    assertTest(!result.matches, "Should NOT match scattered letters across multiple words")
+}
+
+func testWordBoundaryMatching() {
+    // Should match word that starts with pattern
+    let result1 = fuzzyMatch("fire", "Firefox Developer Edition")
+    let result2 = fuzzyMatch("dev", "Firefox Developer Edition")
+
+    assertTest(result1.matches, "Should match word starting with 'fire'")
+    assertTest(result2.matches, "Should match word starting with 'dev'")
+
+    // "fire" is in first word, should score higher
+    assertGreaterThan(result1.score, result2.score, "Earlier word should score higher")
+}
+
+func testSubstringInWord() {
+    // Should match substring within a word
+    let result = fuzzyMatch("ube", "Kubernetes Dashboard")
+    assertTest(result.matches, "Should match substring 'ube' in 'Kubernetes'")
 }
 
 func testNoMatch() {
@@ -183,8 +231,15 @@ func testSingleCharacterMatch() {
 }
 
 func testWhitespaceHandling() {
-    let result = fuzzyMatch("go ch", "google chrome")
-    assertTest(result.matches, "Should handle whitespace in pattern")
+    // Whitespace in pattern should match exact phrase
+    let result1 = fuzzyMatch("google chrome", "google chrome")
+    assertTest(result1.matches, "Should match exact phrase with whitespace")
+    
+    // Single words should still match
+    let result2 = fuzzyMatch("google", "google chrome")
+    let result3 = fuzzyMatch("chrome", "google chrome")
+    assertTest(result2.matches, "Should match first word")
+    assertTest(result3.matches, "Should match second word")
 }
 
 func testSpecialCharacters() {
@@ -256,6 +311,9 @@ testCaseInsensitiveByDefault()
 testCaseSensitiveMode()
 testFuzzyMatchingWithGaps()
 testFuzzyMatchingConsecutiveLetters()
+testNoMatchScatteredLetters()
+testWordBoundaryMatching()
+testSubstringInWord()
 testNoMatch()
 testPartialNoMatch()
 testSingleCharacterMatch()

@@ -240,12 +240,20 @@ yjump -v         # Short form of --version
 
 ## Project Structure
 
+The codebase is organized with clear separation of concerns:
+
+- **main.swift** - Entry point that wires everything together (app delegate, configuration, CLI parsing)
+- **gui.swift** - All GUI components (window management, fuzzy matching, UI elements)
+- **conf.swift** - Configuration file parsing and color handling
+- **cli.swift** - Command-line argument parsing (--help, --version)
+
 ```
 yjump/
 ├── src/
 │   ├── cli.swift       # Command-line argument parsing
 │   ├── conf.swift      # Configuration parsing
-│   └── main.swift      # Main application code
+│   ├── gui.swift       # GUI components and window management
+│   └── main.swift      # Application entry point
 ├── tests/
 │   ├── ConfigTests.swift      # Configuration tests
 │   ├── FuzzyMatchTests.swift  # Fuzzy matching tests
