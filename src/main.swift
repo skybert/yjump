@@ -86,6 +86,9 @@ class WindowManager {
             return windows
         }
         
+        // Group windows by PID for batch AX lookups
+        var windowsByPID: [pid_t: [(dict: [String: Any], number: CGWindowID, bounds: CGRect, name: String)]] = [:]
+        
         for windowDict in windowList {
             guard let ownerPID = windowDict[kCGWindowOwnerPID as String] as? pid_t,
                   let windowNumber = windowDict[kCGWindowNumber as String] as? CGWindowID,
@@ -94,15 +97,8 @@ class WindowManager {
             }
             
             let ownerName = windowDict[kCGWindowOwnerName as String] as? String ?? ""
-            var windowTitle = windowDict[kCGWindowName as String] as? String ?? ""
             
-            // Skip windows without a name
-            if ownerName.isEmpty {
-                continue
-            }
-            
-            // Skip system windows
-            if ownerName == "Window Server" || ownerName == "Dock" {
+            if ownerName.isEmpty || ownerName == "Window Server" || ownerName == "Dock" {
                 continue
             }
             
@@ -113,29 +109,64 @@ class WindowManager {
                 height: boundsDict["Height"] ?? 0
             )
             
-            // Skip windows that are too small (likely not actual windows)
             if bounds.width < 50 || bounds.height < 50 {
                 continue
             }
             
-            // Try to get window title from Accessibility API if not available
-            // Skip AX lookup for browsers that typically don't provide individual tab titles
+            if windowsByPID[ownerPID] == nil {
+                windowsByPID[ownerPID] = []
+            }
+            windowsByPID[ownerPID]?.append((windowDict, windowNumber, bounds, ownerName))
+        }
+        
+        // Process each app's windows
+        for (pid, pidWindows) in windowsByPID {
+            let ownerName = pidWindows[0].name
             let skipAXLookup = ["Google Chrome", "Safari", "Arc", "Microsoft Edge"]
-            if windowTitle.isEmpty && !skipAXLookup.contains(ownerName) {
-                windowTitle = getWindowTitleViaAX(pid: ownerPID, bounds: bounds) ?? ""
+            
+            // Get all AX windows for this app at once
+            var axWindowTitles: [CGRect: String] = [:]
+            if !skipAXLookup.contains(ownerName) {
+                if let axWindows = getAXWindowsForPID(pid: pid) {
+                    for (_, title, bounds) in axWindows {
+                        axWindowTitles[bounds] = title
+                    }
+                }
             }
             
-            // Note: kCGWindowWorkspace is deprecated, using 0 as default
-            let workspace = 0
-            
-            windows.append(WindowInfo(
-                windowNumber: windowNumber,
-                ownerPID: ownerPID,
-                ownerName: ownerName,
-                windowTitle: windowTitle,
-                bounds: bounds,
-                workspace: workspace
-            ))
+            // Match each CG window with AX title
+            for (windowDict, windowNumber, cgBounds, _) in pidWindows {
+                var windowTitle = windowDict[kCGWindowName as String] as? String ?? ""
+                
+                // Try to find matching AX window if no title
+                if windowTitle.isEmpty && !axWindowTitles.isEmpty {
+                    var bestMatch: (title: String, distance: CGFloat)?
+                    
+                    for (axBounds, title) in axWindowTitles {
+                        let distance = boundsDistance(cgBounds, axBounds)
+                        if distance < 50 {
+                            if bestMatch == nil || distance < bestMatch!.distance {
+                                bestMatch = (title, distance)
+                            }
+                        }
+                    }
+                    
+                    if let match = bestMatch {
+                        windowTitle = match.title
+                        // Remove from dict so it won't match again
+                        axWindowTitles = axWindowTitles.filter { boundsDistance(cgBounds, $0.key) >= 50 }
+                    }
+                }
+                
+                windows.append(WindowInfo(
+                    windowNumber: windowNumber,
+                    ownerPID: pid,
+                    ownerName: ownerName,
+                    windowTitle: windowTitle,
+                    bounds: cgBounds,
+                    workspace: 0
+                ))
+            }
         }
         
         // Update cache
@@ -147,57 +178,50 @@ class WindowManager {
         return windows
     }
     
-    static func invalidateCache() {
-        cachedWindows = nil
-        cacheTimestamp = nil
+    static func boundsDistance(_ b1: CGRect, _ b2: CGRect) -> CGFloat {
+        return abs(b1.origin.x - b2.origin.x) + abs(b1.origin.y - b2.origin.y) +
+               abs(b1.width - b2.width) + abs(b1.height - b2.height)
     }
     
-    static func getWindowTitleViaAX(pid: pid_t, bounds: CGRect) -> String? {
+    static func getAXWindowsForPID(pid: pid_t) -> [(element: AXUIElement, title: String, bounds: CGRect)]? {
         let appElement = AXUIElementCreateApplication(pid)
         var windowsRef: AnyObject?
         
-        let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef)
-        
-        guard result == .success, let windows = windowsRef as? [AXUIElement] else {
+        guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+              let windows = windowsRef as? [AXUIElement] else {
             return nil
         }
         
-        // Try to match window by bounds
+        var result: [(AXUIElement, String, CGRect)] = []
+        
         for axWindow in windows {
+            var titleRef: AnyObject?
             var posRef: AnyObject?
             var sizeRef: AnyObject?
             
-            let posResult = AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &posRef)
-            let sizeResult = AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &sizeRef)
+            guard AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleRef) == .success,
+                  let title = titleRef as? String, !title.isEmpty,
+                  AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &posRef) == .success,
+                  AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &sizeRef) == .success,
+                  let posValue = posRef as CFTypeRef?, let sizeValue = sizeRef as CFTypeRef? else {
+                continue
+            }
             
-            if posResult == .success, sizeResult == .success,
-               let posValue = posRef as CFTypeRef?, let sizeValue = sizeRef as CFTypeRef? {
-                var point = CGPoint.zero
-                var size = CGSize.zero
-                
-                if AXValueGetValue(posValue as! AXValue, .cgPoint, &point),
-                   AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) {
-                    
-                    // Check if bounds match (with tolerance for slight differences)
-                    let tolerance: CGFloat = 10
-                    let xMatch = abs(point.x - bounds.origin.x) < tolerance
-                    let yMatch = abs(point.y - bounds.origin.y) < tolerance
-                    let widthMatch = abs(size.width - bounds.width) < tolerance
-                    let heightMatch = abs(size.height - bounds.height) < tolerance
-                    
-                    if xMatch && yMatch && widthMatch && heightMatch {
-                        // Found matching window, get its title
-                        var titleRef: AnyObject?
-                        if AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleRef) == .success,
-                           let title = titleRef as? String, !title.isEmpty {
-                            return title
-                        }
-                    }
-                }
+            var point = CGPoint.zero
+            var size = CGSize.zero
+            
+            if AXValueGetValue(posValue as! AXValue, .cgPoint, &point),
+               AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) {
+                result.append((axWindow, title, CGRect(origin: point, size: size)))
             }
         }
         
-        return nil
+        return result.isEmpty ? nil : result
+    }
+    
+    static func invalidateCache() {
+        cachedWindows = nil
+        cacheTimestamp = nil
     }
     
     static func activateWindow(_ window: WindowInfo) {
