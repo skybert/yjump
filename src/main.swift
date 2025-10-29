@@ -1,5 +1,115 @@
 import Cocoa
 import ApplicationServices
+import Foundation
+
+// MARK: - Configuration
+struct Config {
+    var windowWidth: CGFloat = 600
+    var windowHeight: CGFloat = 50
+    var backgroundColor: NSColor = NSColor(hex: "#2E3440") ?? .darkGray
+    var textColor: NSColor = NSColor(hex: "#ECEFF4") ?? .white
+    var placeholderColor: NSColor = NSColor(hex: "#4C566A") ?? .gray
+    var selectionColor: NSColor = NSColor(hex: "#5E81AC") ?? .blue
+    var borderColor: NSColor = NSColor(hex: "#3B4252") ?? .gray
+    var borderWidth: CGFloat = 2
+    var cornerRadius: CGFloat = 8
+    var fontName: String = "Menlo"
+    var fontSize: CGFloat = 16
+    var maxResults: Int = 10
+    var caseSensitive: Bool = false
+    var position: String = "center"
+    
+    static func load() -> Config {
+        var config = Config()
+        
+        // XDG config locations
+        let configPaths = [
+            ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"].map { "\($0)/yjump/yjump.conf" },
+            "\(NSHomeDirectory())/.config/yjump/yjump.conf",
+            "\(NSHomeDirectory())/.yjump.conf"
+        ].compactMap { $0 }
+        
+        for path in configPaths {
+            if let contents = try? String(contentsOfFile: path, encoding: .utf8) {
+                config.parse(contents)
+                break
+            }
+        }
+        
+        return config
+    }
+    
+    mutating func parse(_ contents: String) {
+        for line in contents.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("#") {
+                continue
+            }
+            
+            let parts = trimmed.components(separatedBy: "=").map { $0.trimmingCharacters(in: .whitespaces) }
+            guard parts.count == 2 else { continue }
+            
+            let key = parts[0]
+            let value = parts[1]
+            
+            switch key {
+            case "window_width":
+                if let val = Double(value) { windowWidth = CGFloat(val) }
+            case "window_height":
+                if let val = Double(value) { windowHeight = CGFloat(val) }
+            case "background_color":
+                if let color = NSColor(hex: value) { backgroundColor = color }
+            case "text_color":
+                if let color = NSColor(hex: value) { textColor = color }
+            case "placeholder_color":
+                if let color = NSColor(hex: value) { placeholderColor = color }
+            case "selection_color":
+                if let color = NSColor(hex: value) { selectionColor = color }
+            case "border_color":
+                if let color = NSColor(hex: value) { borderColor = color }
+            case "border_width":
+                if let val = Double(value) { borderWidth = CGFloat(val) }
+            case "corner_radius":
+                if let val = Double(value) { cornerRadius = CGFloat(val) }
+            case "font_name":
+                fontName = value
+            case "font_size":
+                if let val = Double(value) { fontSize = CGFloat(val) }
+            case "max_results":
+                if let val = Int(value) { maxResults = val }
+            case "case_sensitive":
+                caseSensitive = value.lowercased() == "true"
+            case "position":
+                position = value
+            default:
+                break
+            }
+        }
+    }
+}
+
+extension NSColor {
+    convenience init?(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let r, g, b, a: UInt64
+        switch hex.count {
+        case 6: // RGB
+            (r, g, b, a) = (int >> 16, int >> 8 & 0xFF, int & 0xFF, 255)
+        case 8: // RGBA
+            (r, g, b, a) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            return nil
+        }
+        self.init(
+            red: CGFloat(r) / 255,
+            green: CGFloat(g) / 255,
+            blue: CGFloat(b) / 255,
+            alpha: CGFloat(a) / 255
+        )
+    }
+}
 
 // MARK: - Window Information
 struct WindowInfo {
@@ -16,32 +126,47 @@ struct WindowInfo {
         }
         return "\(ownerName) - \(windowTitle)"
     }
+    
+    var searchableText: String {
+        return displayText.lowercased()
+    }
 }
 
 // MARK: - Fuzzy Matching
-func fuzzyMatch(_ pattern: String, _ text: String) -> (matches: Bool, score: Int) {
-    let patternLower = pattern.lowercased()
-    let textLower = text.lowercased()
+func fuzzyMatch(_ pattern: String, _ text: String, caseSensitive: Bool = false) -> (matches: Bool, score: Int) {
+    let patternToSearch = caseSensitive ? pattern : pattern.lowercased()
+    let textToSearch = caseSensitive ? text : text.lowercased()
     
-    if patternLower.isEmpty {
+    if patternToSearch.isEmpty {
         return (true, 0)
     }
     
-    var patternIndex = patternLower.startIndex
+    // Simple substring matching - matches any part of the text
+    if textToSearch.contains(patternToSearch) {
+        // Score based on position (earlier match = higher score)
+        if let range = textToSearch.range(of: patternToSearch) {
+            let position = textToSearch.distance(from: textToSearch.startIndex, to: range.lowerBound)
+            let score = 1000 - position
+            return (true, score)
+        }
+    }
+    
+    // Fuzzy matching fallback
+    var patternIndex = patternToSearch.startIndex
     var score = 0
     var consecutiveMatch = 0
     
-    for (_, char) in textLower.enumerated() {
-        if patternIndex < patternLower.endIndex && char == patternLower[patternIndex] {
+    for (_, char) in textToSearch.enumerated() {
+        if patternIndex < patternToSearch.endIndex && char == patternToSearch[patternIndex] {
             score += 1 + consecutiveMatch * 5
             consecutiveMatch += 1
-            patternIndex = patternLower.index(after: patternIndex)
+            patternIndex = patternToSearch.index(after: patternIndex)
         } else {
             consecutiveMatch = 0
         }
     }
     
-    let matches = patternIndex == patternLower.endIndex
+    let matches = patternIndex == patternToSearch.endIndex
     return (matches, matches ? score : 0)
 }
 
@@ -131,106 +256,268 @@ class WindowManager {
     }
 }
 
-// MARK: - UI Components
-class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
-    var searchField: NSTextField!
-    var tableView: NSTableView!
-    var scrollView: NSScrollView!
+// MARK: - Custom Text Field
+class CustomTextField: NSTextField {
+    var config: Config
     
-    var allWindows: [WindowInfo] = []
-    var filteredWindows: [WindowInfo] = []
-    var selectedIndex = 0
+    init(config: Config) {
+        self.config = config
+        super.init(frame: .zero)
+        self.setupAppearance()
+    }
     
-    override func loadWindow() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
-            styleMask: [.titled, .closable, .resizable],
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    func setupAppearance() {
+        self.isBordered = false
+        self.isBezeled = false
+        self.drawsBackground = false
+        self.textColor = config.textColor
+        self.font = NSFont(name: config.fontName, size: config.fontSize) ?? NSFont.systemFont(ofSize: config.fontSize)
+        self.focusRingType = .none
+        
+        // Set placeholder color
+        if let placeholder = self.placeholderString {
+            self.placeholderAttributedString = NSAttributedString(
+                string: placeholder,
+                attributes: [
+                    .foregroundColor: config.placeholderColor,
+                    .font: self.font ?? NSFont.systemFont(ofSize: config.fontSize)
+                ]
+            )
+        }
+    }
+}
+
+// MARK: - Custom Window
+class BorderedWindow: NSWindow {
+    var config: Config
+    
+    init(config: Config, height: CGFloat) {
+        self.config = config
+        
+        let contentRect = NSRect(x: 0, y: 0, width: config.windowWidth, height: height)
+        super.init(
+            contentRect: contentRect,
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
-        window.title = "yjump"
-        window.center()
-        window.level = .floating
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         
+        self.isOpaque = false
+        self.backgroundColor = .clear
+        self.level = .floating
+        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        self.hasShadow = true
+    }
+    
+    override var canBecomeKey: Bool {
+        return true
+    }
+    
+    override var canBecomeMain: Bool {
+        return true
+    }
+}
+
+// MARK: - Content View with Border
+class BorderedContentView: NSView {
+    var config: Config
+    
+    init(config: Config) {
+        self.config = config
+        super.init(frame: .zero)
+        self.wantsLayer = true
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func updateLayer() {
+        super.updateLayer()
+        
+        guard let layer = self.layer else { return }
+        
+        layer.backgroundColor = config.backgroundColor.cgColor
+        layer.cornerRadius = config.cornerRadius
+        layer.borderWidth = config.borderWidth
+        layer.borderColor = config.borderColor.cgColor
+    }
+}
+
+// MARK: - UI Components
+class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
+    var searchField: CustomTextField!
+    var tableView: NSTableView!
+    var scrollView: NSScrollView!
+    var containerView: BorderedContentView!
+    
+    var allWindows: [WindowInfo] = []
+    var filteredWindows: [WindowInfo] = []
+    var selectedIndex: Int = 0
+    var config: Config
+    
+    let rowHeight: CGFloat = 30
+    let maxVisibleRows: Int = 10
+    let padding: CGFloat = 12
+    
+    init(config: Config) {
+        self.config = config
+        super.init(window: nil)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func loadWindow() {
+        let window = BorderedWindow(config: config, height: config.windowHeight)
         self.window = window
         
         setupUI()
         loadWindows()
+        positionWindow(window)
+    }
+    
+    func positionWindow(_ window: NSWindow) {
+        if let screen = NSScreen.main {
+            let screenRect = screen.visibleFrame
+            let windowRect = window.frame
+            
+            let x: CGFloat
+            let y: CGFloat
+            
+            if config.position.contains(",") {
+                let coords = config.position.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                if coords.count == 2,
+                   let xVal = Double(coords[0]),
+                   let yVal = Double(coords[1]) {
+                    x = CGFloat(xVal)
+                    y = CGFloat(yVal)
+                } else {
+                    x = screenRect.midX - windowRect.width / 2
+                    y = screenRect.midY - windowRect.height / 2
+                }
+            } else {
+                switch config.position {
+                case "top":
+                    x = screenRect.midX - windowRect.width / 2
+                    y = screenRect.maxY - windowRect.height - 50
+                case "bottom":
+                    x = screenRect.midX - windowRect.width / 2
+                    y = screenRect.minY + 50
+                default:
+                    x = screenRect.midX - windowRect.width / 2
+                    y = screenRect.midY - windowRect.height / 2
+                }
+            }
+            
+            window.setFrameOrigin(NSPoint(x: x, y: y))
+        }
     }
     
     func setupUI() {
         guard let window = self.window else { return }
         
-        let contentView = NSView(frame: window.contentView!.bounds)
-        contentView.autoresizingMask = [.width, .height]
+        containerView = BorderedContentView(config: config)
         
-        // Search field
-        searchField = NSTextField(frame: NSRect(x: 20, y: window.contentView!.bounds.height - 50, width: window.contentView!.bounds.width - 40, height: 30))
-        searchField.autoresizingMask = [.width, .minYMargin]
-        searchField.placeholderString = "Type to search windows..."
+        // Search field at top
+        searchField = CustomTextField(config: config)
+        searchField.placeholderString = "Search windows..."
         searchField.delegate = self
-        searchField.focusRingType = .none
-        contentView.addSubview(searchField)
+        searchField.frame = NSRect(
+            x: padding,
+            y: window.frame.height - config.windowHeight + padding,
+            width: config.windowWidth - (padding * 2),
+            height: config.windowHeight - (padding * 2)
+        )
         
-        // Table view
+        // Table view for results
         tableView = NSTableView()
         tableView.dataSource = self
         tableView.delegate = self
         tableView.headerView = nil
+        tableView.backgroundColor = .clear
+        tableView.selectionHighlightStyle = .regular
+        tableView.rowHeight = rowHeight
+        tableView.intercellSpacing = NSSize(width: 0, height: 0)
         tableView.focusRingType = .none
-        tableView.target = self
-        tableView.doubleAction = #selector(activateSelectedWindow)
         
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("WindowColumn"))
-        column.width = 560
+        column.width = config.windowWidth - (padding * 2)
         tableView.addTableColumn(column)
         
         // Scroll view
-        scrollView = NSScrollView(frame: NSRect(x: 20, y: 20, width: window.contentView!.bounds.width - 40, height: window.contentView!.bounds.height - 90))
-        scrollView.autoresizingMask = [.width, .height]
+        scrollView = NSScrollView()
         scrollView.documentView = tableView
         scrollView.hasVerticalScroller = true
-        contentView.addSubview(scrollView)
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+        scrollView.backgroundColor = .clear
+        scrollView.drawsBackground = false
+        scrollView.frame = NSRect(
+            x: padding,
+            y: padding,
+            width: config.windowWidth - (padding * 2),
+            height: 0
+        )
         
-        window.contentView = contentView
-        window.makeFirstResponder(searchField)
+        containerView.addSubview(searchField)
+        containerView.addSubview(scrollView)
+        
+        window.contentView = containerView
+        
+        // Initial focus
+        DispatchQueue.main.async {
+            window.makeFirstResponder(self.searchField)
+        }
     }
     
     func loadWindows() {
         allWindows = WindowManager.getAllWindows()
-        filteredWindows = allWindows
-        tableView.reloadData()
+        filteredWindows = []
+        updateWindowSize()
+    }
+    
+    func updateWindowSize() {
+        guard let window = self.window else { return }
+        
+        let visibleRowCount = min(filteredWindows.count, maxVisibleRows)
+        let listHeight = CGFloat(visibleRowCount) * rowHeight
+        
+        let newHeight = config.windowHeight + listHeight + (filteredWindows.isEmpty ? 0 : padding)
+        
+        var frame = window.frame
+        let oldHeight = frame.height
+        frame.size.height = newHeight
+        frame.origin.y += (oldHeight - newHeight)
+        
+        window.setFrame(frame, display: true, animate: false)
+        
+        // Update scroll view frame
+        scrollView.frame = NSRect(
+            x: padding,
+            y: padding,
+            width: config.windowWidth - (padding * 2),
+            height: listHeight
+        )
+        
+        // Update search field frame
+        searchField.frame = NSRect(
+            x: padding,
+            y: newHeight - config.windowHeight + padding,
+            width: config.windowWidth - (padding * 2),
+            height: config.windowHeight - (padding * 2)
+        )
     }
     
     // MARK: - NSTextFieldDelegate
     func controlTextDidChange(_ obj: Notification) {
         filterWindows()
-    }
-    
-    override func keyDown(with event: NSEvent) {
-        guard self.window != nil else { return }
-        
-        switch event.keyCode {
-        case 125: // Down arrow
-            if selectedIndex < filteredWindows.count - 1 {
-                selectedIndex += 1
-                tableView.selectRowIndexes(IndexSet(integer: selectedIndex), byExtendingSelection: false)
-                tableView.scrollRowToVisible(selectedIndex)
-            }
-        case 126: // Up arrow
-            if selectedIndex > 0 {
-                selectedIndex -= 1
-                tableView.selectRowIndexes(IndexSet(integer: selectedIndex), byExtendingSelection: false)
-                tableView.scrollRowToVisible(selectedIndex)
-            }
-        case 36: // Return
-            activateSelectedWindow()
-        case 53: // Escape
-            NSApplication.shared.terminate(nil)
-        default:
-            super.keyDown(with: event)
-        }
     }
     
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
@@ -264,30 +551,35 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
         let searchText = searchField.stringValue
         
         if searchText.isEmpty {
-            filteredWindows = allWindows
+            filteredWindows = []
         } else {
             var scoredWindows: [(window: WindowInfo, score: Int)] = []
             
             for window in allWindows {
-                let result = fuzzyMatch(searchText, window.displayText)
+                let result = fuzzyMatch(searchText, window.displayText, caseSensitive: config.caseSensitive)
                 if result.matches {
                     scoredWindows.append((window, result.score))
                 }
             }
             
             scoredWindows.sort { $0.score > $1.score }
-            filteredWindows = scoredWindows.map { $0.window }
+            filteredWindows = Array(scoredWindows.prefix(config.maxResults).map { $0.window })
         }
         
         selectedIndex = 0
         tableView.reloadData()
+        updateWindowSize()
+        
         if !filteredWindows.isEmpty {
             tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         }
     }
     
-    @objc func activateSelectedWindow() {
-        guard selectedIndex >= 0 && selectedIndex < filteredWindows.count else { return }
+    func activateSelectedWindow() {
+        guard selectedIndex >= 0 && selectedIndex < filteredWindows.count else {
+            NSApplication.shared.terminate(nil)
+            return
+        }
         
         let window = filteredWindows[selectedIndex]
         WindowManager.activateWindow(window)
@@ -310,13 +602,16 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
             textField.isBordered = false
             textField.isEditable = false
             textField.backgroundColor = .clear
+            textField.textColor = config.textColor
+            textField.font = NSFont(name: config.fontName, size: config.fontSize - 2) ?? NSFont.systemFont(ofSize: config.fontSize - 2)
+            textField.lineBreakMode = .byTruncatingTail
             textField.translatesAutoresizingMaskIntoConstraints = false
             cell?.addSubview(textField)
             cell?.textField = textField
             
             NSLayoutConstraint.activate([
-                textField.leadingAnchor.constraint(equalTo: cell!.leadingAnchor, constant: 5),
-                textField.trailingAnchor.constraint(equalTo: cell!.trailingAnchor, constant: -5),
+                textField.leadingAnchor.constraint(equalTo: cell!.leadingAnchor, constant: 8),
+                textField.trailingAnchor.constraint(equalTo: cell!.trailingAnchor, constant: -8),
                 textField.centerYAnchor.constraint(equalTo: cell!.centerYAnchor)
             ])
             
@@ -335,6 +630,12 @@ class SearchWindowController: NSWindowController, NSTextFieldDelegate, NSTableVi
     
     func tableViewSelectionDidChange(_ notification: Notification) {
         selectedIndex = tableView.selectedRow
+    }
+    
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+        let rowView = NSTableRowView()
+        rowView.selectionHighlightStyle = .regular
+        return rowView
     }
 }
 
@@ -356,10 +657,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.runModal()
         }
         
-        windowController = SearchWindowController()
+        // Load config
+        let config = Config.load()
+        
+        windowController = SearchWindowController(config: config)
         windowController?.loadWindow()
         windowController?.window?.makeKeyAndOrderFront(nil)
+        
+        // Ensure window gets focus
         NSApp.activate(ignoringOtherApps: true)
+        windowController?.window?.makeKey()
+        windowController?.window?.orderFrontRegardless()
+        windowController?.window?.makeFirstResponder(windowController?.searchField)
     }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -369,6 +678,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 // MARK: - Main
 let app = NSApplication.shared
+app.setActivationPolicy(.accessory) // Don't show in Dock
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()

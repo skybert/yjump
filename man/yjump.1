@@ -9,25 +9,28 @@ is a fast window switcher for macOS that allows you to quickly jump to any windo
 .PP
 When invoked,
 .B yjump
-displays a search interface with an input box where you can type to filter windows. The search uses fuzzy matching, so you don't need to type the exact window title \- just enough characters to uniquely identify the window you want.
+displays a search input box. As you type, a list of matching windows appears below the input, filtered in real-time. The list updates instantly as you continue typing. Use arrow keys to select a window and press Return to activate it.
 .SH FEATURES
 .TP
 .B Fuzzy Search
-Type partial matches of window titles or application names. The search algorithm scores matches based on consecutive character matches, showing the best results first.
+Type any part of window titles or application names. The search matches substrings and scores results, showing the best matches first.
+.TP
+.B Live Filtering
+Window list updates in real-time as you type, showing only matching windows.
 .TP
 .B Cross-Workspace
 Find and switch to windows across all macOS Spaces/workspaces.
 .TP
-.B Fast Navigation
-Use arrow keys (Up/Down) to navigate through the list of matching windows.
+.B Themeable
+Customize colors, fonts, size, and position via configuration file.
 .TP
 .B Keyboard-Driven
 Entirely keyboard-driven interface for maximum efficiency:
 .RS
 .IP \(bu 2
-Type to search
+Type to search and filter
 .IP \(bu 2
-Up/Down arrows to navigate
+Up/Down arrows to navigate results
 .IP \(bu 2
 Return/Enter to activate selected window
 .IP \(bu 2
@@ -48,9 +51,11 @@ Once the interface appears:
 .IP 1. 3
 Start typing part of the window title or application name
 .IP 2. 3
-Use arrow keys to select the desired window
+The window list appears and filters in real-time as you type
 .IP 3. 3
-Press Return to activate the window, or Escape to cancel
+Use Up/Down arrows to select a window from the list
+.IP 4. 3
+Press Return to activate the selected window, or Escape to cancel
 .SH KEYBOARD SHORTCUTS
 .TP
 .B Up Arrow
@@ -64,6 +69,84 @@ Activate the selected window and quit
 .TP
 .B Escape
 Quit without switching windows
+The window list appears and filters in real-time as you type
+.IP 3. 3
+Use Up/Down arrows to select a window from the list
+.IP 4. 3
+Press Return to activate the selected window, or Escape to cancel
+.SH KEYBOARD SHORTCUTS
+.TP
+.B Up Arrow
+Move selection up in the window list
+.TP
+.B Down Arrow
+Move selection down in the window list
+.TP
+.B Return/Enter
+Activate the selected window and quit
+.TP
+.B Escape
+Quit without switching windows
+.SH CONFIGURATION
+.B yjump
+can be customized via a configuration file. The file is searched for in the following locations (in order):
+.PP
+.nf
+.RS
+$XDG_CONFIG_HOME/yjump/yjump.conf
+~/.config/yjump/yjump.conf
+~/.yjump.conf
+.RE
+.fi
+.PP
+An example configuration file is provided in the repository at
+.I conf/yjump.conf
+and is installed to
+.I ~/.config/yjump/yjump.conf
+during installation.
+.SS Configuration Options
+.TP
+.B window_width = 600
+Width of the search window in pixels
+.TP
+.B window_height = 50
+Height of the search window in pixels
+.TP
+.B background_color = #2E3440
+Background color in hex format
+.TP
+.B text_color = #ECEFF4
+Text color in hex format
+.TP
+.B placeholder_color = #4C566A
+Placeholder text color in hex format
+.TP
+.B selection_color = #5E81AC
+Selection/highlight color in hex format
+.TP
+.B border_color = #3B4252
+Border color in hex format
+.TP
+.B border_width = 2
+Border width in pixels
+.TP
+.B corner_radius = 8
+Corner radius for rounded corners in pixels
+.TP
+.B font_name = Menlo
+Font family name
+.TP
+.B font_size = 16
+Font size in points
+.TP
+.B max_results = 10
+Maximum number of results to consider
+.TP
+.B case_sensitive = false
+Enable case-sensitive search (true/false)
+.TP
+.B position = center
+Window position: center, top, bottom, or x,y coordinates (e.g., 100,100)
 .SH PERMISSIONS
 .B yjump
 requires Accessibility permissions to function properly. On first run, macOS will prompt you to grant these permissions. You can also enable them manually:
@@ -80,13 +163,13 @@ Add
 .SH EXAMPLES
 .TP
 Search for a Chrome window:
-Type "chrome" or part of the window title
+Type "chrome" to see all Chrome windows, use arrows to select, press Return
 .TP
 Search for a specific document:
-Type part of the document name, e.g., "readme" to find "README.md - VSCode"
+Type part of the document name, e.g., "readme", use arrows to select, press Return
 .TP
 Quick switch to Terminal:
-Type "term" to match "Terminal"
+Type "term", use arrows if multiple matches, press Return
 .SH FILES
 .TP
 .I ~/.local/bin/yjump
@@ -94,6 +177,12 @@ The installed executable
 .TP
 .I ~/.local/share/man/man1/yjump.1
 This manual page
+.TP
+.I ~/.config/yjump/yjump.conf
+User configuration file
+.TP
+.I $XDG_CONFIG_HOME/yjump/yjump.conf
+Alternative configuration location
 .SH ENVIRONMENT
 .B yjump
 does not use any environment variables.

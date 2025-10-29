@@ -4,10 +4,12 @@
 APP_NAME = yjump
 SRC_DIR = src
 MAN_DIR = man
+CONF_DIR = conf
 BUILD_DIR = build
 INSTALL_PREFIX = $(HOME)/.local
 BIN_DIR = $(INSTALL_PREFIX)/bin
 MAN_INSTALL_DIR = $(INSTALL_PREFIX)/share/man/man1
+CONF_INSTALL_DIR = $(HOME)/.config/yjump
 
 SWIFT_FLAGS = -O
 SOURCES = $(SRC_DIR)/main.swift
@@ -35,14 +37,22 @@ install: build
 	@echo "Installing $(APP_NAME)..."
 	@mkdir -p $(BIN_DIR)
 	@mkdir -p $(MAN_INSTALL_DIR)
+	@mkdir -p $(CONF_INSTALL_DIR)
 	@install -m 755 $(BUILD_DIR)/$(APP_NAME) $(BIN_DIR)/$(APP_NAME)
 	@install -m 644 $(MAN_DIR)/$(APP_NAME).1 $(MAN_INSTALL_DIR)/$(APP_NAME).1
+	@if [ ! -f $(CONF_INSTALL_DIR)/$(APP_NAME).conf ]; then \
+		install -m 644 $(CONF_DIR)/$(APP_NAME).conf $(CONF_INSTALL_DIR)/$(APP_NAME).conf; \
+		echo "Installed config file to $(CONF_INSTALL_DIR)/$(APP_NAME).conf"; \
+	else \
+		echo "Config file already exists at $(CONF_INSTALL_DIR)/$(APP_NAME).conf (not overwriting)"; \
+	fi
 	@echo "Installed $(APP_NAME) to $(BIN_DIR)/$(APP_NAME)"
 	@echo "Installed man page to $(MAN_INSTALL_DIR)/$(APP_NAME).1"
 	@echo ""
 	@echo "Installation complete!"
 	@echo "Run '$(APP_NAME)' to use the application"
 	@echo "Run 'man $(APP_NAME)' to view the manual"
+	@echo "Edit $(CONF_INSTALL_DIR)/$(APP_NAME).conf to customize appearance"
 
 # Uninstall the application
 uninstall:
@@ -50,6 +60,7 @@ uninstall:
 	@rm -f $(BIN_DIR)/$(APP_NAME)
 	@rm -f $(MAN_INSTALL_DIR)/$(APP_NAME).1
 	@echo "Uninstalled $(APP_NAME)"
+	@echo "Note: Config file at $(CONF_INSTALL_DIR)/$(APP_NAME).conf was not removed"
 
 # Run tests (placeholder for future tests)
 test:
