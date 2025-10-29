@@ -1,0 +1,76 @@
+# yjump Makefile
+# Swift window switcher for macOS
+
+APP_NAME = yjump
+SRC_DIR = src
+MAN_DIR = man
+BUILD_DIR = build
+INSTALL_PREFIX = $(HOME)/.local
+BIN_DIR = $(INSTALL_PREFIX)/bin
+MAN_INSTALL_DIR = $(INSTALL_PREFIX)/share/man/man1
+
+SWIFT_FLAGS = -O
+SOURCES = $(SRC_DIR)/main.swift
+
+.PHONY: all build clean install uninstall test run help
+
+all: build
+
+# Build the application
+build: $(BUILD_DIR)/$(APP_NAME)
+
+$(BUILD_DIR)/$(APP_NAME): $(SOURCES)
+	@echo "Building $(APP_NAME)..."
+	@mkdir -p $(BUILD_DIR)
+	swiftc $(SWIFT_FLAGS) $(SOURCES) -o $(BUILD_DIR)/$(APP_NAME)
+	@echo "Build complete: $(BUILD_DIR)/$(APP_NAME)"
+
+# Run the application
+run: build
+	@echo "Running $(APP_NAME)..."
+	@$(BUILD_DIR)/$(APP_NAME)
+
+# Install the application and man page
+install: build
+	@echo "Installing $(APP_NAME)..."
+	@mkdir -p $(BIN_DIR)
+	@mkdir -p $(MAN_INSTALL_DIR)
+	@install -m 755 $(BUILD_DIR)/$(APP_NAME) $(BIN_DIR)/$(APP_NAME)
+	@install -m 644 $(MAN_DIR)/$(APP_NAME).1 $(MAN_INSTALL_DIR)/$(APP_NAME).1
+	@echo "Installed $(APP_NAME) to $(BIN_DIR)/$(APP_NAME)"
+	@echo "Installed man page to $(MAN_INSTALL_DIR)/$(APP_NAME).1"
+	@echo ""
+	@echo "Installation complete!"
+	@echo "Run '$(APP_NAME)' to use the application"
+	@echo "Run 'man $(APP_NAME)' to view the manual"
+
+# Uninstall the application
+uninstall:
+	@echo "Uninstalling $(APP_NAME)..."
+	@rm -f $(BIN_DIR)/$(APP_NAME)
+	@rm -f $(MAN_INSTALL_DIR)/$(APP_NAME).1
+	@echo "Uninstalled $(APP_NAME)"
+
+# Run tests (placeholder for future tests)
+test:
+	@echo "Running tests..."
+	@echo "No tests defined yet"
+
+# Clean build artifacts
+clean:
+	@echo "Cleaning build artifacts..."
+	@rm -rf $(BUILD_DIR)
+	@echo "Clean complete"
+
+# Display help
+help:
+	@echo "yjump - Fast window switcher for macOS"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  make build      - Build the application (default)"
+	@echo "  make run        - Build and run the application"
+	@echo "  make install    - Install to $(BIN_DIR)"
+	@echo "  make uninstall  - Remove installed files"
+	@echo "  make test       - Run tests"
+	@echo "  make clean      - Remove build artifacts"
+	@echo "  make help       - Show this help message"

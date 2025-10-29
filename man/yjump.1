@@ -1,0 +1,124 @@
+.TH YJUMP 1 "2024" "yjump 1.0" "User Commands"
+.SH NAME
+yjump \- fast window switcher for macOS with fuzzy search
+.SH SYNOPSIS
+.B yjump
+.SH DESCRIPTION
+.B yjump
+is a fast window switcher for macOS that allows you to quickly jump to any window of any application on any workspace. It provides a fuzzy search interface similar to rofi on Linux/i3, enabling you to type parts of a window name or title to quickly locate and switch to it.
+.PP
+When invoked,
+.B yjump
+displays a search interface with an input box where you can type to filter windows. The search uses fuzzy matching, so you don't need to type the exact window title \- just enough characters to uniquely identify the window you want.
+.SH FEATURES
+.TP
+.B Fuzzy Search
+Type partial matches of window titles or application names. The search algorithm scores matches based on consecutive character matches, showing the best results first.
+.TP
+.B Cross-Workspace
+Find and switch to windows across all macOS Spaces/workspaces.
+.TP
+.B Fast Navigation
+Use arrow keys (Up/Down) to navigate through the list of matching windows.
+.TP
+.B Keyboard-Driven
+Entirely keyboard-driven interface for maximum efficiency:
+.RS
+.IP \(bu 2
+Type to search
+.IP \(bu 2
+Up/Down arrows to navigate
+.IP \(bu 2
+Return/Enter to activate selected window
+.IP \(bu 2
+Escape to cancel
+.RE
+.SH USAGE
+Launch
+.B yjump
+from the terminal or bind it to a global hotkey for quick access:
+.PP
+.nf
+.RS
+$ yjump
+.RE
+.fi
+.PP
+Once the interface appears:
+.IP 1. 3
+Start typing part of the window title or application name
+.IP 2. 3
+Use arrow keys to select the desired window
+.IP 3. 3
+Press Return to activate the window, or Escape to cancel
+.SH KEYBOARD SHORTCUTS
+.TP
+.B Up Arrow
+Move selection up in the window list
+.TP
+.B Down Arrow
+Move selection down in the window list
+.TP
+.B Return/Enter
+Activate the selected window and quit
+.TP
+.B Escape
+Quit without switching windows
+.SH PERMISSIONS
+.B yjump
+requires Accessibility permissions to function properly. On first run, macOS will prompt you to grant these permissions. You can also enable them manually:
+.PP
+.nf
+.RS
+System Preferences → Security & Privacy → Privacy → Accessibility
+.RE
+.fi
+.PP
+Add
+.B yjump
+(or your terminal emulator) to the list of allowed applications.
+.SH EXAMPLES
+.TP
+Search for a Chrome window:
+Type "chrome" or part of the window title
+.TP
+Search for a specific document:
+Type part of the document name, e.g., "readme" to find "README.md - VSCode"
+.TP
+Quick switch to Terminal:
+Type "term" to match "Terminal"
+.SH FILES
+.TP
+.I ~/.local/bin/yjump
+The installed executable
+.TP
+.I ~/.local/share/man/man1/yjump.1
+This manual page
+.SH ENVIRONMENT
+.B yjump
+does not use any environment variables.
+.SH EXIT STATUS
+.TP
+.B 0
+Window successfully activated or user cancelled
+.TP
+.B 1
+Error occurred (e.g., missing permissions)
+.SH NOTES
+.IP \(bu 2
+Very small windows (< 50x50 pixels) are filtered out as they're likely not actual application windows
+.IP \(bu 2
+System windows like "Window Server" and "Dock" are excluded from the list
+.IP \(bu 2
+Windows without titles show only the application name
+.IP \(bu 2
+The search is case-insensitive
+.SH SEE ALSO
+.BR open (1),
+.BR osascript (1)
+.SH BUGS
+Report bugs to: https://github.com/skybert/yjump/issues
+.SH AUTHOR
+Written for fast window switching on macOS.
+.SH COPYRIGHT
+This is free software: you are free to change and redistribute it.
