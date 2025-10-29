@@ -589,7 +589,7 @@ class SearchWindowController:
 
     // Search field at top
     searchField = CustomTextField(config: config)
-    searchField.placeholderString = "> Type a few chars to jump to window"
+    searchField.placeholderString = "> Type a few characters to find window to jump to"
     searchField.delegate = self
     searchField.frame = NSRect(
       x: config.inputPadding,
