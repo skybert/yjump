@@ -463,7 +463,35 @@ class BorderedContentView: NSView {
 
 class CustomTableCellTextField: NSTextField {
   override var allowsVibrancy: Bool {
-    return true
+    return false  // Disable vibrancy to control text color manually
+  }
+}
+
+class CustomTableCellView: NSTableCellView {
+  var config: Config
+  var normalTextColor: NSColor
+  var selectedTextColor: NSColor
+
+  init(config: Config) {
+    self.config = config
+    self.normalTextColor = config.textColor
+    self.selectedTextColor = config.selectedTextColor
+    super.init(frame: .zero)
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override var backgroundStyle: NSView.BackgroundStyle {
+    didSet {
+      // Update text color based on selection state
+      if let textField = textField {
+        textField.textColor = backgroundStyle == .emphasized
+          ? selectedTextColor
+          : normalTextColor
+      }
+    }
   }
 }
 
@@ -811,10 +839,10 @@ class SearchWindowController:
     let identifier = NSUserInterfaceItemIdentifier("WindowCell")
     var cell =
       tableView.makeView(withIdentifier: identifier, owner: self)
-      as? NSTableCellView
+      as? CustomTableCellView
 
     if cell == nil {
-      cell = NSTableCellView()
+      cell = CustomTableCellView(config: config)
       let textField = CustomTableCellTextField()
       textField.isBordered = false
       textField.isEditable = false

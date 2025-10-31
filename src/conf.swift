@@ -4,12 +4,13 @@ import Foundation
 // MARK: - Configuration
 
 public struct Config {
-    var windowWidth: CGFloat = 600
+    var windowWidth: CGFloat = 720
     var windowHeight: CGFloat = 60
     var backgroundColor: NSColor = .init(hex: "#24273A") ?? .darkGray
     var textColor: NSColor = .init(hex: "#CAD3F5") ?? .white
     var placeholderColor: NSColor = .init(hex: "#6E738D") ?? .gray
     var selectionColor: NSColor = .init(hex: "#8AADF4") ?? .blue
+    var selectedTextColor: NSColor = .init(hex: "#24273A") ?? .black
     var borderColor: NSColor = .init(hex: "#5B6078") ?? .gray
     var borderWidth: CGFloat = 2
     var cornerRadius: CGFloat = 8
@@ -80,6 +81,8 @@ public struct Config {
                 if let color = NSColor(hex: value) { placeholderColor = color }
             case "selection_color":
                 if let color = NSColor(hex: value) { selectionColor = color }
+            case "selected_text_color":
+                if let color = NSColor(hex: value) { selectedTextColor = color }
             case "border_color":
                 if let color = NSColor(hex: value) { borderColor = color }
             case "border_width":
