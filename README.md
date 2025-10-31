@@ -1,5 +1,10 @@
 # yjump
 
+<img
+  src="screenshot.png"
+  alt="screenshot of yjump"
+/>
+
 A fast window switcher for macOS with fuzzy search, inspired by rofi
 on Linux/i3.
 
