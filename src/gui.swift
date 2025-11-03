@@ -557,8 +557,19 @@ class SearchWindowController:
     self.window = window
 
     setupUI()
-    loadWindows()
     positionWindow(window)
+    
+    // Show window immediately before loading windows
+    window.makeKeyAndOrderFront(nil)
+    NSApp.activate(ignoringOtherApps: true)
+    window.makeKey()
+    window.orderFrontRegardless()
+    window.makeFirstResponder(searchField)
+    
+    // Load windows asynchronously to not block UI
+    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+      self?.loadWindows()
+    }
 
     // Always monitor focus loss and close when it happens
     setupFocusMonitoring()
@@ -583,7 +594,11 @@ class SearchWindowController:
   }
 
   func positionWindow(_ window: NSWindow) {
-    if let screen = NSScreen.main {
+    // Get the screen containing the mouse cursor (Spotlight behavior)
+    let mouseLocation = NSEvent.mouseLocation
+    let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) ?? NSScreen.main
+    
+    if let screen = screen {
       let screenRect = screen.visibleFrame
       let windowRect = window.frame
 
@@ -695,9 +710,18 @@ class SearchWindowController:
     WindowManager.setCacheTimeout(config.cacheTimeoutSeconds)
 
     // Load windows (will use cache if enabled)
-    allWindows = WindowManager.getAllWindows(
+    let windows = WindowManager.getAllWindows(
       useCache: config.cacheWindowList)
-    filteredWindows = []
+    
+    // Update on main thread
+    DispatchQueue.main.async { [weak self] in
+      self?.allWindows = windows
+      self?.filteredWindows = []
+      // Re-filter if user already started typing
+      if let searchText = self?.searchField.stringValue, !searchText.isEmpty {
+        self?.filterWindows()
+      }
+    }
   }
 
   func updateWindowSize() {

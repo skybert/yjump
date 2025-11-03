@@ -56,17 +56,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Load config
     let config = Config.load()
 
-    // Create and show window
+    // Create and show window (window will show itself immediately in loadWindow)
     windowController = SearchWindowController(config: config)
     windowController?.loadWindow()
-    windowController?.window?.makeKeyAndOrderFront(self)
-
-    // Ensure window gets focus
-    NSApp.activate(ignoringOtherApps: true)
-    windowController?.window?.makeKey()
-    windowController?.window?.orderFrontRegardless()
-    windowController?.window?.makeFirstResponder(
-      windowController?.searchField)
   }
 
   func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication)
