@@ -10,6 +10,8 @@ INSTALL_PREFIX = $(HOME)/.local
 BIN_DIR = $(INSTALL_PREFIX)/bin
 MAN_INSTALL_DIR = $(INSTALL_PREFIX)/share/man/man1
 CONF_INSTALL_DIR = $(HOME)/.config/yjump
+APP_BUNDLE = $(APP_NAME).app
+INSTALL_APP_DIR = /Applications
 
 SWIFT_FLAGS = -O
 SOURCES = $(SRC_DIR)/cli.swift $(SRC_DIR)/conf.swift $(SRC_DIR)/gui.swift $(SRC_DIR)/main.swift
@@ -50,6 +52,17 @@ run: build
 # Install the application and man page
 install: build
 	@echo "Installing $(APP_NAME)..."
+	@# Create app bundle structure
+	@mkdir -p $(BUILD_DIR)/$(APP_BUNDLE)/Contents/MacOS
+	@mkdir -p $(BUILD_DIR)/$(APP_BUNDLE)/Contents/Resources
+	@# Copy binary to app bundle
+	@cp $(BUILD_DIR)/$(APP_NAME) $(BUILD_DIR)/$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
+	@# Create Info.plist from template
+	@sed 's/GIT_VERSION_PLACEHOLDER/$(GIT_VERSION)/' $(SRC_DIR)/yjump.plist > $(BUILD_DIR)/$(APP_BUNDLE)/Contents/Info.plist
+	@# Install app bundle to /Applications
+	@rm -rf $(INSTALL_APP_DIR)/$(APP_BUNDLE)
+	@cp -R $(BUILD_DIR)/$(APP_BUNDLE) $(INSTALL_APP_DIR)/$(APP_BUNDLE)
+	@# Also install CLI binary and man page
 	@mkdir -p $(BIN_DIR)
 	@mkdir -p $(MAN_INSTALL_DIR)
 	@mkdir -p $(CONF_INSTALL_DIR)
@@ -67,17 +80,19 @@ install: build
 	else \
 		echo "Config file already exists at $(CONF_INSTALL_DIR)/$(APP_NAME).conf (not overwriting)"; \
 	fi
-	@echo "Installed $(APP_NAME) to $(BIN_DIR)/$(APP_NAME)"
+	@echo "Installed $(APP_NAME).app to $(INSTALL_APP_DIR)/$(APP_BUNDLE)"
+	@echo "Installed $(APP_NAME) CLI to $(BIN_DIR)/$(APP_NAME)"
 	@echo "Installed man page to $(MAN_INSTALL_DIR)/$(APP_NAME).1"
 	@echo ""
 	@echo "Installation complete!"
-	@echo "Run '$(APP_NAME)' to use the application"
+	@echo "Run '$(APP_NAME)' from terminal or launch from Applications folder"
 	@echo "Run 'man $(APP_NAME)' to view the manual"
 	@echo "Edit $(CONF_INSTALL_DIR)/$(APP_NAME).conf to customize appearance"
 
 # Uninstall the application
 uninstall:
 	@echo "Uninstalling $(APP_NAME)..."
+	@rm -rf $(INSTALL_APP_DIR)/$(APP_BUNDLE)
 	@rm -f $(BIN_DIR)/$(APP_NAME)
 	@rm -f $(MAN_INSTALL_DIR)/$(APP_NAME).1
 	@echo "Uninstalled $(APP_NAME)"
