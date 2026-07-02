@@ -111,6 +111,8 @@ test:
 		swift tests/FuzzyMatchTests.swift && \
 		echo "Building and running WindowInfoTests..."; \
 		swift tests/WindowInfoTests.swift && \
+		echo "Building and running WindowFilterTests..."; \
+		swift tests/WindowFilterTests.swift && \
 		echo ""; \
 		echo "All tests passed!"; \
 	fi

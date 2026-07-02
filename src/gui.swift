@@ -120,9 +120,14 @@ class WindowManager {
 
     var windows: [WindowInfo] = []
 
+    // Do not restrict to `.optionOnScreenOnly`: a maximised (native
+    // full-screen) app occupies its own Space, so "on screen" is limited to
+    // the currently active Space. That made yjump list only windows sharing
+    // the current maximisation state (e.g. just kitty when invoked from a
+    // maximised kitty). Enumerating all Spaces lets us jump to every window.
     guard
       let windowList = CGWindowListCopyWindowInfo(
-        [.optionOnScreenOnly, .excludeDesktopElements],
+        [.excludeDesktopElements],
         kCGNullWindowID
       ) as? [[String: Any]]
     else {
@@ -150,11 +155,8 @@ class WindowManager {
       let ownerName =
         windowDict[kCGWindowOwnerName as String] as? String ?? ""
 
-      if ownerName.isEmpty || ownerName == "Window Server"
-        || ownerName == "Dock"
-      {
-        continue
-      }
+      let windowLayer =
+        windowDict[kCGWindowLayer as String] as? Int ?? 0
 
       let bounds = CGRect(
         x: boundsDict["X"] ?? 0,
@@ -163,7 +165,9 @@ class WindowManager {
         height: boundsDict["Height"] ?? 0
       )
 
-      if bounds.width < 50 || bounds.height < 50 {
+      if !shouldListWindow(
+        ownerName: ownerName, layer: windowLayer, bounds: bounds)
+      {
         continue
       }
 
@@ -243,6 +247,36 @@ class WindowManager {
     return abs(b1.origin.x - b2.origin.x)
       + abs(b1.origin.y - b2.origin.y) + abs(b1.width - b2.width)
       + abs(b1.height - b2.height)
+  }
+
+  /// Decides whether a CoreGraphics window should be offered as a jump target.
+  ///
+  /// Now that `getAllWindows` enumerates every Space (so maximised, native
+  /// full-screen apps are listed too), we can no longer rely on
+  /// `.optionOnScreenOnly` to implicitly hide chrome. This filter keeps only
+  /// normal, reasonably sized application windows.
+  static func shouldListWindow(
+    ownerName: String, layer: Int, bounds: CGRect
+  ) -> Bool {
+    // Skip windows with no owner or owned by system UI.
+    if ownerName.isEmpty || ownerName == "Window Server"
+      || ownerName == "Dock"
+    {
+      return false
+    }
+
+    // Only normal application windows live at layer 0; higher layers are
+    // menus, panels, the status bar and other UI chrome.
+    if layer != 0 {
+      return false
+    }
+
+    // Ignore tiny helper/utility windows.
+    if bounds.width < 50 || bounds.height < 50 {
+      return false
+    }
+
+    return true
   }
 
   static func getAXWindowsForPID(pid: pid_t) -> [(
